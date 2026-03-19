@@ -1,0 +1,461 @@
+No devices found yet. Checking for wireless devices...
+Launching lib/main.dart on joshua’s iPhone (wireless) in debug mode...
+Automatically signing iOS for device deployment using specified development team in Xcode project: ZVMUT9CXUF
+Running Xcode build...                                          
+Xcode build done.                                           29.0s
+Installing and launching...                                     
+flutter: [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m│ {environment: development, version: 1.0.0}[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ #0   ErrorHandler.info (package:tradeflow_ai/core/errors/error_handler.dart:109:13)[0m
+flutter: [38;5;12m│ #1   _initializeApp (package:tradeflow_ai/main.dart:30:18)[0m
+flutter: [38;5;12m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;12m│ #3   main (package:tradeflow_ai/main.dart:14:3)[0m
+flutter: [38;5;12m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 20:08:31.409 (+0:00:00.001088)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 💡 Initializing TradeFlow AI[0m
+flutter: [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: supabase.supabase_flutter: INFO: ***** Supabase init completed ***** 
+flutter: [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m│ #0   ErrorHandler.info (package:tradeflow_ai/core/errors/error_handler.dart:109:13)[0m
+flutter: [38;5;12m│ #1   _initializeApp (package:tradeflow_ai/main.dart:42:18)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 20:08:31.446 (+0:00:00.037806)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 💡 Supabase initialized successfully[0m
+flutter: [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m│ {userId: 9c2ab227-0559-4193-b27a-deedfc8d7623}[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ #0   ErrorHandler.info (package:tradeflow_ai/core/errors/error_handler.dart:109:13)[0m
+flutter: [38;5;12m│ #1   _TradeFlowAppState._initSession (package:tradeflow_ai/main.dart:79:22)[0m
+flutter: [38;5;12m│ #2   _TradeFlowAppState.initState (package:tradeflow_ai/main.dart:66:5)[0m
+flutter: [38;5;12m│ #3   StatefulElement._firstBuild (package:flutter/src/widgets/framework.dart:5953:55)[0m
+flutter: [38;5;12m│ #4   ComponentElement.mount (package:flutter/src/widgets/framework.dart:5796:5)[0m
+flutter: [38;5;12m│ #5   Element.inflateWidget (package:flutter/src/widgets/framework.dart:4590:20)[0m
+flutter: [38;5;12m│ #6   Element.updateChild (package:flutter/src/widgets/framework.dart:4059:18)[0m
+flutter: [38;5;12m│ #7   ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5844:16)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 20:08:31.484 (+0:00:00.075897)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 💡 Existing session found[0m
+flutter: [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+Installing and launching...                                        40.3s
+flutter: supabase.auth: INFO: Refresh session 
+flutter: [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m│ {status: online}[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ #0   ErrorHandler.info (package:tradeflow_ai/core/errors/error_handler.dart:109:13)[0m
+flutter: [38;5;12m│ #1   ConnectivityService._updateConnectivityStatus (package:tradeflow_ai/core/utils/connectivity_service.dart:92:20)[0m
+flutter: [38;5;12m│ #2   ConnectivityService._updateStatus (package:tradeflow_ai/core/utils/connectivity_service.dart:78:7)[0m
+flutter: [38;5;12m│ #3   ConnectivityService._initialize.<anonymous closure> (package:tradeflow_ai/core/utils/connectivity_service.dart:53:9)[0m
+flutter: [38;5;12m│ #4   _RootZone.runUnaryGuarded (dart:async/zone.dart:1778:10)[0m
+flutter: [38;5;12m│ #5   _BufferingStreamSubscription._sendData (dart:async/stream_impl.dart:381:11)[0m
+flutter: [38;5;12m│ #6   _BufferingStreamSubscription._add (dart:async/stream_impl.dart:312:7)[0m
+flutter: [38;5;12m│ #7   _ForwardingStreamSubscription._add (dart:async/stream_pipe.dart:154:11)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 20:08:37.587 (+0:00:06.178921)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 💡 Connectivity status changed[0m
+flutter: [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {count: 0}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   JobListNotifier.loadJobs (package:tradeflow_ai/presentation/providers/job_provider.dart:60:20)
+flutter: │ #2   <asynchronous suspension>
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:37.662 (+0:00:06.253976)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Jobs loaded successfully
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {totalRevenue: 0.0, totalExpenses: 0.0, profit: 0.0}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   AnalyticsNotifier.loadAnalytics (package:tradeflow_ai/presentation/providers/analytics_provider.dart:138:20)
+flutter: │ #2   <asynchronous suspension>
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:37.667 (+0:00:06.259303)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Analytics loaded
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+Target native_assets required define SdkRoot but it was not provided
+Syncing files to device joshua’s iPhone (wireless)...              266ms
+
+Flutter run key commands.
+r Hot reload. 🔥🔥🔥
+R Hot restart.
+h List all available interactive commands.
+d Detach (terminate "flutter run" but leave application running).
+c Clear the screen
+q Quit (terminate the application on the device).
+
+A Dart VM Service on joshua’s iPhone is available at: http://127.0.0.1:59781/g8Oet_bB9cM=/
+The Flutter DevTools debugger and profiler on joshua’s iPhone is available at: http://127.0.0.1:59781/g8Oet_bB9cM=/devtools/?uri=ws://127.0.0.1:59781/g8Oet_bB9cM=/ws
+flutter: [38;5;196m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m│ PostgrestException(message: column profiles.user_id does not exist, code: 42703, details: Bad Request, hint: null)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ #0   PostgrestBuilder._parseResponse (package:postgrest/src/postgrest_builder.dart:299:7)[0m
+flutter: [38;5;196m│ #1   PostgrestBuilder._execute (package:postgrest/src/postgrest_builder.dart:174:14)[0m
+flutter: [38;5;196m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #3   PostgrestBuilder.then (package:postgrest/src/postgrest_builder.dart:397:24)[0m
+flutter: [38;5;196m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ 20:08:39.685 (+0:00:08.276842)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ ⛔ Unexpected Error[0m
+flutter: [38;5;196m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {error: AppException: Failed to fetch data from profiles, delay: 2000}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:65:22)
+flutter: │ #2   <asynchronous suspension>
+flutter: │ #3   ProfileNotifier.loadProfile (package:tradeflow_ai/presentation/providers/profile_provider.dart:53:23)
+flutter: │ #4   <asynchronous suspension>
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:39.692 (+0:00:08.283859)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Retry attempt 1/2
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m│ {path: /var/mobile/Containers/Data/Application/EFBBBA8A-5AB3-481A-A9A1-FB0F147C5953/Library/Caches/job_capture_1771898925614.m4a}[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ #0   ErrorHandler.info (package:tradeflow_ai/core/errors/error_handler.dart:109:13)[0m
+flutter: [38;5;12m│ #1   VoiceCaptureService.startRecording (package:tradeflow_ai/data/services/voice_capture_service.dart:135:20)[0m
+flutter: [38;5;12m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;12m│ #3   VoiceCaptureNotifier.startRecording (package:tradeflow_ai/presentation/providers/voice_provider.dart:32:7)[0m
+flutter: [38;5;12m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;12m│ #5   DashboardScreenNew.build.<anonymous closure> (package:tradeflow_ai/presentation/screens/dashboard_screen_new.dart:94:25)[0m
+flutter: [38;5;12m│ #6   <asynchronous suspension>[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 20:08:45.907 (+0:00:14.499116)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 💡 Recording started[0m
+flutter: [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m│ PostgrestException(message: column profiles.user_id does not exist, code: 42703, details: Bad Request, hint: null)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ #0   PostgrestBuilder._parseResponse (package:postgrest/src/postgrest_builder.dart:299:7)[0m
+flutter: [38;5;196m│ #1   PostgrestBuilder._execute (package:postgrest/src/postgrest_builder.dart:174:14)[0m
+flutter: [38;5;196m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #3   PostgrestBuilder.then (package:postgrest/src/postgrest_builder.dart:397:24)[0m
+flutter: [38;5;196m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ 20:08:46.025 (+0:00:14.617405)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ ⛔ Unexpected Error[0m
+flutter: [38;5;196m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;208m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;208m│ {error: AppException: Failed to fetch data from profiles}[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ #0   ErrorHandler.warning (package:tradeflow_ai/core/errors/error_handler.dart:119:13)[0m
+flutter: [38;5;208m│ #1   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:57:24)[0m
+flutter: [38;5;208m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #3   ProfileNotifier.loadProfile (package:tradeflow_ai/presentation/providers/profile_provider.dart:53:23)[0m
+flutter: [38;5;208m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ 20:08:46.026 (+0:00:14.618629)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ ⚠️ Operation failed after 2 attempts[0m
+flutter: [38;5;208m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m│ PostgrestException(message: column profiles.user_id does not exist, code: 42703, details: Bad Request, hint: null)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ #0   PostgrestBuilder._parseResponse (package:postgrest/src/postgrest_builder.dart:299:7)[0m
+flutter: [38;5;196m│ #1   PostgrestBuilder._execute (package:postgrest/src/postgrest_builder.dart:174:14)[0m
+flutter: [38;5;196m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #3   PostgrestBuilder.then (package:postgrest/src/postgrest_builder.dart:397:24)[0m
+flutter: [38;5;196m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ 20:08:46.027 (+0:00:14.619174)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ ⛔ App Error: Failed to fetch data from profiles[0m
+flutter: [38;5;196m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;12m│ {path: /var/mobile/Containers/Data/Application/EFBBBA8A-5AB3-481A-A9A1-FB0F147C5953/Library/Caches/job_capture_1771898925614.m4a, size: 156791}[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ #0   ErrorHandler.info (package:tradeflow_ai/core/errors/error_handler.dart:109:13)[0m
+flutter: [38;5;12m│ #1   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:193:20)[0m
+flutter: [38;5;12m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;12m│ #3   VoiceCaptureNotifier.stopAndProcess (package:tradeflow_ai/presentation/providers/voice_provider.dart:42:22)[0m
+flutter: [38;5;12m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;12m│ #5   DashboardScreenNew.build.<anonymous closure> (package:tradeflow_ai/presentation/screens/dashboard_screen_new.dart:82:40)[0m
+flutter: [38;5;12m│ #6   <asynchronous suspension>[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 20:08:53.508 (+0:00:22.100077)[0m
+flutter: [38;5;12m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;12m│ 💡 Recording stopped[0m
+flutter: [38;5;12m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {bucket: job-audio, path: ios/899155cb-0232-4f60-b425-4f83f957a1c5.m4a}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   SupabaseService.uploadFile (package:tradeflow_ai/data/services/supabase_service.dart:399:20)
+flutter: │ #2   <asynchronous suspension>
+flutter: │ #3   VoiceRepository.uploadAudio (package:tradeflow_ai/data/repositories/voice_repository.dart:31:7)
+flutter: │ #4   <asynchronous suspension>
+flutter: │ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)
+flutter: │ #6   <asynchronous suspension>
+flutter: │ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:217:27)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:54.134 (+0:00:22.726512)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 File upload successful
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {path: ios/899155cb-0232-4f60-b425-4f83f957a1c5.m4a, size: 156791}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   VoiceRepository.uploadAudio (package:tradeflow_ai/data/repositories/voice_repository.dart:38:20)
+flutter: │ #2   <asynchronous suspension>
+flutter: │ #3   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)
+flutter: │ #4   <asynchronous suspension>
+flutter: │ #5   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:217:27)
+flutter: │ #6   <asynchronous suspension>
+flutter: │ #7   VoiceCaptureNotifier.stopAndProcess (package:tradeflow_ai/presentation/providers/voice_provider.dart:42:22)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:54.139 (+0:00:22.730839)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Audio uploaded successfully
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {hasUser: true, userId: 9c2ab227-0559-4193-b27a-deedfc8d7623, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 9c2ab227-0559-4193-b27a-deedfc8d7623, jwtRole: authenticated, jwtExp: 1771902518, jwtIat: 1771898918, jwtIsAnonymous: true}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   SupabaseService.ensureValidSession (package:tradeflow_ai/data/services/supabase_service.dart:117:18)
+flutter: │ #2   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:467:13)
+flutter: │ #3   VoiceRepository.transcribeAudio (package:tradeflow_ai/data/repositories/voice_repository.dart:63:40)
+flutter: │ #4   VoiceCaptureService._transcribeWithRetry.<anonymous closure> (package:tradeflow_ai/data/services/voice_capture_service.dart:297:25)
+flutter: │ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:31)
+flutter: │ #6   VoiceCaptureService._transcribeWithRetry (package:tradeflow_ai/data/services/voice_capture_service.dart:296:22)
+flutter: │ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:228:32)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:54.148 (+0:00:22.740681)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Supabase: ensureValidSession (before)
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {hasUser: true, userId: 9c2ab227-0559-4193-b27a-deedfc8d7623, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 9c2ab227-0559-4193-b27a-deedfc8d7623, jwtRole: authenticated, jwtExp: 1771902518, jwtIat: 1771898918, jwtIsAnonymous: true}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   SupabaseService.ensureValidSession (package:tradeflow_ai/data/services/supabase_service.dart:223:20)
+flutter: │ #2   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:467:13)
+flutter: │ #3   VoiceRepository.transcribeAudio (package:tradeflow_ai/data/repositories/voice_repository.dart:63:40)
+flutter: │ #4   VoiceCaptureService._transcribeWithRetry.<anonymous closure> (package:tradeflow_ai/data/services/voice_capture_service.dart:297:25)
+flutter: │ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:31)
+flutter: │ #6   VoiceCaptureService._transcribeWithRetry (package:tradeflow_ai/data/services/voice_capture_service.dart:296:22)
+flutter: │ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:228:32)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:54.152 (+0:00:22.744000)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Supabase: ensureValidSession (ok)
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {function: transcribe_audio}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:489:20)
+flutter: │ #2   <asynchronous suspension>
+flutter: │ #3   VoiceRepository.transcribeAudio (package:tradeflow_ai/data/repositories/voice_repository.dart:63:24)
+flutter: │ #4   <asynchronous suspension>
+flutter: │ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)
+flutter: │ #6   <asynchronous suspension>
+flutter: │ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:228:26)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:55.956 (+0:00:24.547853)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Function invocation successful
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {length: 71}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   VoiceRepository.transcribeAudio (package:tradeflow_ai/data/repositories/voice_repository.dart:77:20)
+flutter: │ #2   <asynchronous suspension>
+flutter: │ #3   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)
+flutter: │ #4   <asynchronous suspension>
+flutter: │ #5   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:228:26)
+flutter: │ #6   <asynchronous suspension>
+flutter: │ #7   VoiceCaptureNotifier.stopAndProcess (package:tradeflow_ai/presentation/providers/voice_provider.dart:42:22)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:55.959 (+0:00:24.551234)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Transcription successful
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {hasUser: true, userId: 9c2ab227-0559-4193-b27a-deedfc8d7623, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 9c2ab227-0559-4193-b27a-deedfc8d7623, jwtRole: authenticated, jwtExp: 1771902518, jwtIat: 1771898918, jwtIsAnonymous: true}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   SupabaseService.ensureValidSession (package:tradeflow_ai/data/services/supabase_service.dart:117:18)
+flutter: │ #2   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:467:13)
+flutter: │ #3   VoiceRepository.extractJobData (package:tradeflow_ai/data/repositories/voice_repository.dart:106:40)
+flutter: │ #4   VoiceCaptureService._extractWithRetry.<anonymous closure> (package:tradeflow_ai/data/services/voice_capture_service.dart:314:25)
+flutter: │ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:31)
+flutter: │ #6   VoiceCaptureService._extractWithRetry (package:tradeflow_ai/data/services/voice_capture_service.dart:313:22)
+flutter: │ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:35)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:55.963 (+0:00:24.555277)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Supabase: ensureValidSession (before)
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: ┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: │ {hasUser: true, userId: 9c2ab227-0559-4193-b27a-deedfc8d7623, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 9c2ab227-0559-4193-b27a-deedfc8d7623, jwtRole: authenticated, jwtExp: 1771902518, jwtIat: 1771898918, jwtIsAnonymous: true}
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ #0   ErrorHandler.debug (package:tradeflow_ai/core/errors/error_handler.dart:114:13)
+flutter: │ #1   SupabaseService.ensureValidSession (package:tradeflow_ai/data/services/supabase_service.dart:223:20)
+flutter: │ #2   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:467:13)
+flutter: │ #3   VoiceRepository.extractJobData (package:tradeflow_ai/data/repositories/voice_repository.dart:106:40)
+flutter: │ #4   VoiceCaptureService._extractWithRetry.<anonymous closure> (package:tradeflow_ai/data/services/voice_capture_service.dart:314:25)
+flutter: │ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:31)
+flutter: │ #6   VoiceCaptureService._extractWithRetry (package:tradeflow_ai/data/services/voice_capture_service.dart:313:22)
+flutter: │ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:35)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 20:08:55.966 (+0:00:24.558044)
+flutter: ├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+flutter: │ 🐛 Supabase: ensureValidSession (ok)
+flutter: └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+flutter: [38;5;208m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;208m│ {function: process_job, details: {code: 401, message: Invalid JWT}, hasUser: true, userId: 9c2ab227-0559-4193-b27a-deedfc8d7623, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 9c2ab227-0559-4193-b27a-deedfc8d7623, jwtRole: authenticated, jwtExp: 1771902518, jwtIat: 1771898918, jwtIsAnonymous: true}[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ #0   ErrorHandler.warning (package:tradeflow_ai/core/errors/error_handler.dart:119:13)[0m
+flutter: [38;5;208m│ #1   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:499:22)[0m
+flutter: [38;5;208m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #3   VoiceRepository.extractJobData (package:tradeflow_ai/data/repositories/voice_repository.dart:106:24)[0m
+flutter: [38;5;208m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #5   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)[0m
+flutter: [38;5;208m│ #6   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #7   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:29)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ 20:08:56.185 (+0:00:24.777052)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ ⚠️ Edge Function rejected JWT (401)[0m
+flutter: [38;5;208m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: supabase.auth: INFO: Refresh session 
+flutter: supabase.auth: INFO: Signing out user with scope: SignOutScope.local 
+flutter: [38;5;208m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;208m│ FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ #0   ErrorHandler._logError (package:tradeflow_ai/core/errors/error_handler.dart:64:17)[0m
+flutter: [38;5;208m│ #1   ErrorHandler.handle (package:tradeflow_ai/core/errors/error_handler.dart:22:5)[0m
+flutter: [38;5;208m│ #2   VoiceRepository.extractJobData (package:tradeflow_ai/data/repositories/voice_repository.dart:131:20)[0m
+flutter: [38;5;208m│ #3   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #4   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)[0m
+flutter: [38;5;208m│ #5   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #6   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:29)[0m
+flutter: [38;5;208m│ #7   <asynchronous suspension>[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ 20:08:57.249 (+0:00:25.841303)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ ⚠️ Auth Error: Supabase rejected the request to `process_job` (401 Invalid JWT).[0m
+flutter: [38;5;208m│ ⚠️ Diagnostics: {hasUser: true, userId: 672ae5ed-da27-4f91-a43a-9057951b4a5c, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 672ae5ed-da27-4f91-a43a-9057951b4a5c, jwtRole: authenticated, jwtExp: 1771902537, jwtIat: 1771898937, jwtIsAnonymous: true}[0m
+flutter: [38;5;208m│ ⚠️ Recovery details: FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;208m│ ⚠️ Most common causes:[0m
+flutter: [38;5;208m│ ⚠️ 1) A cached session from another Supabase project is being reused (check `jwtIss`).[0m
+flutter: [38;5;208m│ ⚠️ 2) The project JWT secret was rotated and the Edge Function verification is out of sync.[0m
+flutter: [38;5;208m│ ⚠️ Fix:[0m
+flutter: [38;5;208m│ ⚠️ - If `jwtIss` does not match `https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1`: sign out (or delete the app) to clear cached sessions.[0m
+flutter: [38;5;208m│ ⚠️ - If `jwtIss` matches and it still fails: redeploy the Edge Function (or temporarily disable `verify_jwt`) and retry.[0m
+flutter: [38;5;208m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;208m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;208m│ {error: AppException: Supabase rejected the request to `process_job` (401 Invalid JWT).[0m
+flutter: [38;5;208m│ Diagnostics: {hasUser: true, userId: 672ae5ed-da27-4f91-a43a-9057951b4a5c, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 672ae5ed-da27-4f91-a43a-9057951b4a5c, jwtRole: authenticated, jwtExp: 1771902537, jwtIat: 1771898937, jwtIsAnonymous: true}[0m
+flutter: [38;5;208m│ Recovery details: FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;208m│ Most common causes:[0m
+flutter: [38;5;208m│ 1) A cached session from another Supabase project is being reused (check `jwtIss`).[0m
+flutter: [38;5;208m│ 2) The project JWT secret was rotated and the Edge Function verification is out of sync.[0m
+flutter: [38;5;208m│ Fix:[0m
+flutter: [38;5;208m│ - If `jwtIss` does not match `https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1`: sign out (or delete the app) to clear cached sessions.[0m
+flutter: [38;5;208m│ - If `jwtIss` matches and it still fails: redeploy the Edge Function (or temporarily disable `verify_jwt`) and retry.}[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ #0   ErrorHandler.warning (package:tradeflow_ai/core/errors/error_handler.dart:119:13)[0m
+flutter: [38;5;208m│ #1   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:57:24)[0m
+flutter: [38;5;208m│ #2   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #3   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:29)[0m
+flutter: [38;5;208m│ #4   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #5   VoiceCaptureNotifier.stopAndProcess (package:tradeflow_ai/presentation/providers/voice_provider.dart:42:22)[0m
+flutter: [38;5;208m│ #6   <asynchronous suspension>[0m
+flutter: [38;5;208m│ #7   DashboardScreenNew.build.<anonymous closure> (package:tradeflow_ai/presentation/screens/dashboard_screen_new.dart:82:40)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ 20:08:57.254 (+0:00:25.845904)[0m
+flutter: [38;5;208m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;208m│ ⚠️ Operation failed after 1 attempts[0m
+flutter: [38;5;208m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m│ AppException: Supabase rejected the request to `process_job` (401 Invalid JWT).[0m
+flutter: [38;5;196m│ Diagnostics: {hasUser: true, userId: 672ae5ed-da27-4f91-a43a-9057951b4a5c, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 672ae5ed-da27-4f91-a43a-9057951b4a5c, jwtRole: authenticated, jwtExp: 1771902537, jwtIat: 1771898937, jwtIsAnonymous: true}[0m
+flutter: [38;5;196m│ Recovery details: FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;196m│ Most common causes:[0m
+flutter: [38;5;196m│ 1) A cached session from another Supabase project is being reused (check `jwtIss`).[0m
+flutter: [38;5;196m│ 2) The project JWT secret was rotated and the Edge Function verification is out of sync.[0m
+flutter: [38;5;196m│ Fix:[0m
+flutter: [38;5;196m│ - If `jwtIss` does not match `https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1`: sign out (or delete the app) to clear cached sessions.[0m
+flutter: [38;5;196m│ - If `jwtIss` matches and it still fails: redeploy the Edge Function (or temporarily disable `verify_jwt`) and retry.[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ #0   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:567:9)[0m
+flutter: [38;5;196m│ #1   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #2   VoiceRepository.extractJobData (package:tradeflow_ai/data/repositories/voice_repository.dart:106:24)[0m
+flutter: [38;5;196m│ #3   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #4   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)[0m
+flutter: [38;5;196m│ #5   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #6   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:29)[0m
+flutter: [38;5;196m│ #7   <asynchronous suspension>[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ 20:08:57.257 (+0:00:25.849122)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ ⛔ App Error: Supabase rejected the request to `process_job` (401 Invalid JWT).[0m
+flutter: [38;5;196m│ ⛔ Diagnostics: {hasUser: true, userId: 672ae5ed-da27-4f91-a43a-9057951b4a5c, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 672ae5ed-da27-4f91-a43a-9057951b4a5c, jwtRole: authenticated, jwtExp: 1771902537, jwtIat: 1771898937, jwtIsAnonymous: true}[0m
+flutter: [38;5;196m│ ⛔ Recovery details: FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;196m│ ⛔ Most common causes:[0m
+flutter: [38;5;196m│ ⛔ 1) A cached session from another Supabase project is being reused (check `jwtIss`).[0m
+flutter: [38;5;196m│ ⛔ 2) The project JWT secret was rotated and the Edge Function verification is out of sync.[0m
+flutter: [38;5;196m│ ⛔ Fix:[0m
+flutter: [38;5;196m│ ⛔ - If `jwtIss` does not match `https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1`: sign out (or delete the app) to clear cached sessions.[0m
+flutter: [38;5;196m│ ⛔ - If `jwtIss` matches and it still fails: redeploy the Edge Function (or temporarily disable `verify_jwt`) and retry.[0m
+flutter: [38;5;196m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m┌───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+flutter: [38;5;196m│ AppException: Supabase rejected the request to `process_job` (401 Invalid JWT).[0m
+flutter: [38;5;196m│ Diagnostics: {hasUser: true, userId: 672ae5ed-da27-4f91-a43a-9057951b4a5c, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 672ae5ed-da27-4f91-a43a-9057951b4a5c, jwtRole: authenticated, jwtExp: 1771902537, jwtIat: 1771898937, jwtIsAnonymous: true}[0m
+flutter: [38;5;196m│ Recovery details: FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;196m│ Most common causes:[0m
+flutter: [38;5;196m│ 1) A cached session from another Supabase project is being reused (check `jwtIss`).[0m
+flutter: [38;5;196m│ 2) The project JWT secret was rotated and the Edge Function verification is out of sync.[0m
+flutter: [38;5;196m│ Fix:[0m
+flutter: [38;5;196m│ - If `jwtIss` does not match `https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1`: sign out (or delete the app) to clear cached sessions.[0m
+flutter: [38;5;196m│ - If `jwtIss` matches and it still fails: redeploy the Edge Function (or temporarily disable `verify_jwt`) and retry.[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ #0   SupabaseService.invokeFunction (package:tradeflow_ai/data/services/supabase_service.dart:567:9)[0m
+flutter: [38;5;196m│ #1   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #2   VoiceRepository.extractJobData (package:tradeflow_ai/data/repositories/voice_repository.dart:106:24)[0m
+flutter: [38;5;196m│ #3   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #4   RetryUtil.retry (package:tradeflow_ai/core/utils/retry_util.dart:51:16)[0m
+flutter: [38;5;196m│ #5   <asynchronous suspension>[0m
+flutter: [38;5;196m│ #6   VoiceCaptureService.stopAndProcess (package:tradeflow_ai/data/services/voice_capture_service.dart:239:29)[0m
+flutter: [38;5;196m│ #7   <asynchronous suspension>[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ 20:08:57.260 (+0:00:25.852366)[0m
+flutter: [38;5;196m├┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄[0m
+flutter: [38;5;196m│ ⛔ App Error: Supabase rejected the request to `process_job` (401 Invalid JWT).[0m
+flutter: [38;5;196m│ ⛔ Diagnostics: {hasUser: true, userId: 672ae5ed-da27-4f91-a43a-9057951b4a5c, hasSession: true, isExpired: false, tokenPresent: true, tokenSegments: 3, tokenLength: 691, jwtAlg: ES256, jwtKid: 9433580e-64bc-46eb-9f3d-e6601b967381, jwtIss: https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1, jwtAud: authenticated, jwtSub: 672ae5ed-da27-4f91-a43a-9057951b4a5c, jwtRole: authenticated, jwtExp: 1771902537, jwtIat: 1771898937, jwtIsAnonymous: true}[0m
+flutter: [38;5;196m│ ⛔ Recovery details: FunctionException(status: 401, details: {code: 401, message: Invalid JWT}, reasonPhrase: Unauthorized)[0m
+flutter: [38;5;196m│ ⛔ Most common causes:[0m
+flutter: [38;5;196m│ ⛔ 1) A cached session from another Supabase project is being reused (check `jwtIss`).[0m
+flutter: [38;5;196m│ ⛔ 2) The project JWT secret was rotated and the Edge Function verification is out of sync.[0m
+flutter: [38;5;196m│ ⛔ Fix:[0m
+flutter: [38;5;196m│ ⛔ - If `jwtIss` does not match `https://macjrzrjiwxvopzkuhdx.supabase.co/auth/v1`: sign out (or delete the app) to clear cached sessions.[0m
+flutter: [38;5;196m│ ⛔ - If `jwtIss` matches and it still fails: redeploy the Edge Function (or temporarily disable `verify_jwt`) and retry.[0m
+flutter: [38;5;196m└───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[0m
+The OS has terminated the Flutter debug connection for being inactive in the background for too long.
+
+There are no errors with your Flutter application.
+
+To reconnect, launch your application again via 'flutter run'
+The OS has terminated the Flutter debug connection for being inactive in the background for too long.
+
+There are no errors with your Flutter application.
+
+To reconnect, launch your application again via 'flutter run'
+Lost connection to device.

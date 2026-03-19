@@ -1,0 +1,11 @@
+[functions.process_job]
+verify_jwt = false
+
+[functions.transcribe_audio]
+verify_jwt = false
+
+[functions.create_stripe_checkout]
+verify_jwt = false
+
+[functions.stripe_webhook]
+verify_jwt = false

@@ -1,0 +1,114 @@
+name: tradeflow_ai
+description: "Tradesman Ledger - A professional AI-powered tool for tradespeople to manage invoices, quotes, expenses, and jobs."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Core Dependencies
+  cupertino_icons: ^1.0.8
+  
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  
+  # Backend & Database (Cloud)
+  supabase_flutter: ^2.4.0
+  
+  # Local Database (Offline-First)
+  drift: ^2.14.1
+  sqlite3_flutter_libs: ^0.5.18
+  path: ^1.8.3
+  
+  # Voice Recording
+  record: 5.0.0
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.1
+  
+  # Utilities
+  uuid: ^4.3.3
+  intl: ^0.19.0
+  
+  # Financial (Precise Money Handling)
+  money2: ^5.1.0
+  decimal: ^3.0.0
+  
+  # PDF Generation
+  pdf: ^3.10.8
+  printing: ^5.11.1
+  
+  # Images & OCR
+  image_picker: ^1.0.7
+  camera: ^0.10.5
+  google_mlkit_text_recognition: ^0.11.0
+  image: ^4.1.7
+  
+  # Environment Configuration
+  flutter_dotenv: ^5.1.0
+  
+  # Networking & Retry Logic
+  dio: ^5.4.1
+  # connectivity_plus removed – crashes on iOS 26 beta simulators due to
+  # objective_c.framework FFI issue. Replaced with pure-Dart DNS reachability
+  # check in ConnectivityService.
+  
+  # Background Sync
+  workmanager: ^0.5.2
+  
+  # Error Handling & Logging
+  logger: ^2.0.2+1
+  
+  # UI Enhancements
+  shimmer: ^3.0.0
+  lottie: ^3.0.0
+  flutter_animate: ^4.5.0
+  
+  # Charts & Analytics
+  fl_chart: ^0.66.0
+  
+  # File Handling
+  open_filex: ^4.3.4
+
+  # Local Preferences
+  shared_preferences: ^2.2.2
+  marionette_flutter: ^0.3.0
+  sentry_flutter: ^9.14.0
+  url_launcher: ^6.3.2
+  flutter_svg: ^2.2.4
+  google_fonts: ^8.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  
+  # Code Generation
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.4.0
+  drift_dev: ^2.14.0
+  
+  # Testing
+  mockito: ^5.4.4
+  integration_test:
+    sdk: flutter
+  marionette_mcp: ^0.3.0
+
+dependency_overrides:
+  record_linux:
+    path: third_party/record_linux
+
+flutter:
+  uses-material-design: true
+  
+  # Environment Files
+  assets:
+    - .env.development
+    - .env.production
+    - assets/animations/
+    - assets/images/

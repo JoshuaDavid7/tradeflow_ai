@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(supabase functions deploy:*)",
+      "Bash(supabase functions list:*)",
+      "Bash(flutter build:*)",
+      "Bash(flutter run:*)",
+      "Bash(flutter devices:*)",
+      "Bash(xcrun simctl:*)",
+      "Bash(open:*)",
+      "Bash(pkill:*)",
+      "Bash(supabase db execute:*)",
+      "Bash(supabase db push:*)",
+      "Bash(flutter pub get:*)",
+      "Bash(flutter analyze:*)",
+      "WebFetch(domain:www.quickbillmaker.com)",
+      "WebFetch(domain:invoice.2go.com)",
+      "WebFetch(domain:pdforge.com)",
+      "WebFetch(domain:pdfnoodle.com)",
+      "WebFetch(domain:www.invoicegenfree.com)",
+      "WebFetch(domain:smallpdf.com)",
+      "Bash(/Users/joshuadavid/flutter/bin/flutter analyze:*)"
+    ]
+  }
+}

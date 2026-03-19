@@ -1,0 +1,8 @@
+# Build configuration for code generation
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          # Generate companion classes for easier inserts/updates
+          generate_connect_constructor: true

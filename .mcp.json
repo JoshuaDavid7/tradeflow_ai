@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "marionette": {
+      "command": "/Users/joshuadavid/flutter/bin/dart",
+      "args": ["run", "marionette_mcp"],
+      "cwd": "/Users/joshuadavid/tradeflow_ai"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+class BusinessProfile {
+  final String id;
+  final String businessName;
+  final String? businessAddress;
+  final String? businessPhone;
+  final String? businessEmail;
+  final String? taxId;
+  final double hourlyRate;
+  final double taxRate;
+  final String currencySymbol;
+  final bool isPro;
+  final String subscriptionStatus;
+
+  BusinessProfile({
+    required this.id,
+    required this.businessName,
+    this.businessAddress,
+    this.businessPhone,
+    this.businessEmail,
+    this.taxId,
+    required this.hourlyRate,
+    required this.taxRate,
+    required this.currencySymbol,
+    this.isPro = false,
+    this.subscriptionStatus = 'none',
+  });
+
+  factory BusinessProfile.fromJson(Map<String, dynamic> json) => BusinessProfile(
+        id: (json['id'] ?? json['user_id'])?.toString() ?? '',
+        businessName: json['business_name']?.toString() ?? 'My Trade Business',
+        businessAddress: json['business_address']?.toString(),
+        businessPhone: json['business_phone']?.toString(),
+        businessEmail: json['business_email']?.toString(),
+        taxId: json['tax_id']?.toString(),
+        hourlyRate: ((json['hourly_rate'] ?? json['default_hourly_rate']) as num? ?? 85.0).toDouble(),
+        taxRate: ((json['tax_rate'] ?? json['default_tax_rate']) as num? ?? 0.0).toDouble(),
+        currencySymbol: json['currency_symbol']?.toString() ?? '\$',
+        isPro: json['is_pro'] as bool? ?? false,
+        subscriptionStatus: json['subscription_status']?.toString() ?? 'none',
+      );
+}
