@@ -6,8 +6,10 @@ import '../core/theme/app_theme.dart';
 import '../presentation/providers/job_provider.dart';
 import '../presentation/providers/analytics_provider.dart';
 import '../presentation/providers/customer_ledger_provider.dart';
+import '../presentation/providers/profile_provider.dart';
 import '../presentation/screens/main_shell_screen.dart';
 import '../presentation/widgets/record_payment_sheet.dart';
+import '../presentation/widgets/shimmer_loading.dart';
 import 'draft_review_screen.dart';
 import 'pdf_preview_screen.dart';
 
@@ -112,7 +114,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         }).toList();
       case 'paid':
         // Payment-state filter: sent invoices whose balance is settled.
+        // Requires status='sent' to exclude cancelled/draft edge cases.
         return _allJobs.where((j) {
+          if (j['status']?.toString().toLowerCase() != 'sent') return false;
           final total =
               double.tryParse(j['total_amount']?.toString() ?? '0') ?? 0;
           final amountPaid =
@@ -188,8 +192,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       container.invalidate(jobListProvider);
       container.invalidate(customerLedgerListProvider);
       container.read(analyticsProvider.notifier).refresh();
-    } catch (_) {
-      // ProviderScope not available — ignore
+    } catch (e) {
+      debugPrint('History: provider invalidation failed: $e');
     }
   }
 
@@ -211,8 +215,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         bottom: TabBar(
           controller: _tabController,
           isScrollable: false,
-          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-          unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          indicatorWeight: 3,
           tabs: [
             Tab(text: 'All (${_allJobs.length})'),
             Tab(text: 'Drafts (${_getFilteredJobs('draft').length})'),
@@ -222,7 +225,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Column(children: [
+                ShimmerLoadingListItem(),
+                ShimmerLoadingListItem(),
+                ShimmerLoadingListItem(),
+              ]),
+            )
           : _error != null && _allJobs.isEmpty
               ? _buildErrorState()
               : RefreshIndicator(
@@ -242,6 +252,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
   Widget _buildList(List<Map<String, dynamic>> jobs) {
     if (jobs.isEmpty) return _buildEmptyState();
+    final currencySymbol = ref.watch(currencySymbolProvider);
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -260,6 +271,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         final isSent = status == 'sent' ||
             status == 'paid' ||
             status == 'cancelled';
+        final isCancelled = status == 'cancelled';
 
         return GestureDetector(
           onTap: () => Navigator.push(
@@ -274,9 +286,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             _invalidateProviders();
           }),
           child: Card(
-            margin: const EdgeInsets.only(bottom: 12),
+            margin: const EdgeInsets.only(bottom: 8),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -300,7 +312,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                           )),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
                       (job['client_name']?.toString().trim().isNotEmpty ?? false)
                           ? job['client_name'].toString().trim()
@@ -311,28 +323,62 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                       maxLines: 1,
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
+                        // Mute cancelled cards so amount doesn't read as active
+                        color: isCancelled ? colorScheme.onSurfaceVariant : null,
                       )),
-                  const SizedBox(height: 4),
-                  Text(job['description']?.toString() ?? 'No description',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      )),
-                  const SizedBox(height: 14),
-                  // Price always visible on its own line
-                  Text('\$${total.toStringAsFixed(2)}',
-                      maxLines: 1,
-                      style: textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      )),
-                  const SizedBox(height: 10),
-                  // Status action buttons wrap below the price
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _buildStatusActionsList(context, job),
+                  const SizedBox(height: 2),
+                  // Show description only if meaningful (not empty/generic).
+                  if (_isDescriptionUseful(job['description']?.toString()))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(job['description'].toString(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          )),
+                    ),
+                  // Show partial-payment subtitle for invoices with payments.
+                  if (_hasPartialPayment(job))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Text(
+                          '$currencySymbol${(double.tryParse(job['amount_paid']?.toString() ?? '0') ?? 0).toStringAsFixed(2)} of $currencySymbol${total.toStringAsFixed(2)} paid',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.paid(context),
+                            fontWeight: FontWeight.w600,
+                          )),
+                    ),
+                  const SizedBox(height: 6),
+                  // Price + status actions on the same row for compactness
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Price — muted + line-through for cancelled
+                      Text('$currencySymbol${total.toStringAsFixed(2)}',
+                          maxLines: 1,
+                          style: textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: isCancelled ? colorScheme.onSurfaceVariant : null,
+                            decoration: isCancelled ? TextDecoration.lineThrough : null,
+                            decorationColor: isCancelled ? colorScheme.onSurfaceVariant : null,
+                          )),
+                      const SizedBox(width: 12),
+                      // Status action buttons inline after price
+                      ..._buildStatusActionsList(context, job),
+                    ],
                   ),
+                  // Cancelled subtitle
+                  if (isCancelled)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text('Superseded — no longer active',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                            fontStyle: FontStyle.italic,
+                            fontSize: 11,
+                          )),
+                    ),
                 ],
               ),
             ),
@@ -353,7 +399,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
     if (currentStatus == 'draft') {
       return [
-        _actionChip(context, 'Open', Icons.edit_outlined,
+        _actionChip(context, 'Edit', Icons.edit_outlined,
             Theme.of(context).colorScheme.primary,
             () => Navigator.push(
                   context,
@@ -370,31 +416,98 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       final type = job['type']?.toString().toLowerCase() ?? 'invoice';
       if (type == 'invoice') {
         if (isFullyPaid) {
+          // Paid in full — inline confirmation text instead of lone icon
           return [
-            Icon(Icons.check_circle, color: AppColors.paid(context), size: 24),
-            _deleteChip(context, () => _confirmDeleteJob(jobId)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.check_circle, color: AppColors.paid(context), size: 18),
+                const SizedBox(width: 4),
+                Text('Paid in full',
+                    style: TextStyle(
+                      color: AppColors.paid(context),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    )),
+              ],
+            ),
+          ];
+        }
+        // Zero-dollar invoice — no payable balance, skip Record Payment CTA
+        if (total <= 0) {
+          return [
+            Text('\u2014 no balance',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  fontStyle: FontStyle.italic,
+                )),
           ];
         }
         return [
           _actionChip(context, 'Record Payment', Icons.payments_rounded,
               AppColors.paid(context), () => _recordPayment(job)),
-          _deleteChip(context, () => _confirmDeleteJob(jobId)),
         ];
       }
-      // Sent quote — no payment action
-      return [
-        _deleteChip(context, () => _confirmDeleteJob(jobId)),
-      ];
+      // Sent quote — no actions (not deletable either; it's a financial record)
+      return [];
     }
     return [];
   }
 
+  /// Generic boilerplate descriptions that add no value to the card.
+  static const _genericDescriptions = {
+    'untitled job',
+    'services rendered',
+    'professional services',
+    'labour',
+    'labor',
+    'service',
+    'work performed',
+    'no description',
+  };
+
+  /// Returns true if the description is non-null, non-empty, and not generic.
+  bool _isDescriptionUseful(String? description) {
+    if (description == null || description.trim().isEmpty) return false;
+    return !_genericDescriptions.contains(description.toLowerCase().trim());
+  }
+
+  /// Returns true if the invoice has a partial payment (> 0 but not fully paid).
+  bool _hasPartialPayment(Map<String, dynamic> job) {
+    final total =
+        double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
+    final amountPaid =
+        double.tryParse(job['amount_paid']?.toString() ?? '0') ?? 0;
+    if (total <= 0 || amountPaid < 0.01) return false;
+    return amountPaid < total - 0.01; // Has payment but not fully paid
+  }
+
   Future<void> _confirmDeleteJob(String jobId) async {
+    // Safety: only allow deletion of drafts. Sent/paid/cancelled jobs
+    // are financial records that must not be casually removed.
+    final job = _allJobs.firstWhere(
+        (j) => j['id']?.toString() == jobId,
+        orElse: () => <String, dynamic>{});
+    final status = job['status']?.toString().toLowerCase() ?? '';
+    if (status != 'draft') {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sent invoices cannot be deleted.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Job'),
-        content: const Text('Are you sure you want to delete this job? This action cannot be undone.'),
+        title: const Text('Delete Draft'),
+        content: const Text('Are you sure you want to delete this draft? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -418,7 +531,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Job deleted'),
+            content: Text('Draft deleted'),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -439,7 +552,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   /// De-emphasized delete button — text-only, no background, positioned after
   /// the primary status actions to reduce accidental taps.
   Widget _deleteChip(BuildContext context, VoidCallback onTap) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.55);
+    final deleteColor = Theme.of(context).colorScheme.error.withValues(alpha: 0.7);
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 36),
       child: InkWell(
@@ -450,11 +563,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.delete_outline, size: 14, color: muted),
+              Icon(Icons.delete_outline, size: 14, color: deleteColor),
               const SizedBox(width: 3),
               Text('Delete',
                   style: TextStyle(
-                      color: muted, fontSize: 11, fontWeight: FontWeight.w500)),
+                      color: deleteColor, fontSize: 11, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -482,8 +595,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 4),
               Text(label,
-                  style: TextStyle(
-                      color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+                  style: AppTextStyles.chipLabel(color)),
             ],
           ),
         ),
@@ -542,8 +654,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           Icon(icon, size: 10, color: color),
           const SizedBox(width: 3),
           Text(label,
-              style: TextStyle(
-                  color: color, fontSize: 10, fontWeight: FontWeight.w900)),
+              style: AppTextStyles.badge(color)),
         ],
       ),
     );
@@ -558,8 +669,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(6)),
       child: Text(type.toUpperCase(),
-          style: TextStyle(
-              color: color, fontSize: 10, fontWeight: FontWeight.w800)),
+          style: AppTextStyles.badge(color)),
     );
   }
 
@@ -571,20 +681,27 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.work_off_outlined, size: 64, color: colorScheme.outlineVariant),
+          Icon(Icons.work_off_outlined, size: 56, color: colorScheme.outlineVariant),
           const SizedBox(height: 16),
           Text('No jobs here yet',
-              style: textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              )),
+              style: AppTextStyles.emptyTitle(textTheme, colorScheme)),
           const SizedBox(height: 8),
           Text(
-              'Tap + Create on the Home tab to\nadd your first invoice or quote',
+              'Create your first invoice or quote to see it here',
               textAlign: TextAlign.center,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              )),
+              style: AppTextStyles.emptyBody(textTheme, colorScheme)),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: () {
+              // Switch to Home tab
+              ref.read(bottomNavIndexProvider.notifier).state = 0;
+            },
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Create'),
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            ),
+          ),
         ],
       ),
     );

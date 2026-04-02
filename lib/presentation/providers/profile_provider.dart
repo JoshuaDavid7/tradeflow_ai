@@ -152,3 +152,23 @@ final taxRateProvider = Provider<double>((ref) {
 final isProProvider = Provider<bool>((ref) {
   return ref.watch(profileProvider).profile?.isPro ?? false;
 });
+
+/// Provider for default due days
+final defaultDueDaysProvider = Provider<int>((ref) {
+  return ref.watch(profileProvider).profile?.defaultDueDays ?? 14;
+});
+
+/// Provider for default markup percent
+final defaultMarkupProvider = Provider<double>((ref) {
+  return ref.watch(profileProvider).profile?.defaultMarkupPercent ?? 0.0;
+});
+
+/// Provider for invoice prefix
+final invoicePrefixProvider = Provider<String>((ref) {
+  return ref.watch(profileProvider).profile?.invoicePrefix ?? 'INV';
+});
+
+/// Provider for quote prefix
+final quotePrefixProvider = Provider<String>((ref) {
+  return ref.watch(profileProvider).profile?.quotePrefix ?? 'QUO';
+});

@@ -288,7 +288,10 @@ class BusinessSettings extends Table {
   
   // Invoice settings
   TextColumn get invoicePrefix => text().nullable()();
+  TextColumn get quotePrefix => text().nullable()();
   IntColumn get nextInvoiceNumber => integer().withDefault(const Constant(1))();
+  IntColumn get defaultDueDays => integer().withDefault(const Constant(14))();
+  RealColumn get defaultMarkupPercent => real().withDefault(const Constant(0.0))();
   TextColumn get defaultPaymentTerms => text().nullable()();
   
   // Subscription

@@ -154,8 +154,8 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
           await _generatePdf();
           setState(() {});
         }
-      } catch (_) {
-        // Best-effort refresh — still show stale data if fetch fails
+      } catch (e) {
+        debugPrint('PDF preview refresh failed (showing stale data): $e');
       }
     }
   }
@@ -246,9 +246,10 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
       final container = ProviderScope.containerOf(context);
       container.invalidate(jobStatsProvider);
       container.invalidate(jobListProvider);
+      container.invalidate(customerLedgerListProvider);
       container.read(analyticsProvider.notifier).refresh();
-    } catch (_) {
-      // Non-critical — the job was shared successfully, status update is best-effort.
+    } catch (e) {
+      debugPrint('Post-share status update failed (non-critical): $e');
     }
   }
 

@@ -8,84 +8,91 @@ const corsHeaders = {
 }
 
 Deno.serve(async (req) => {
-  // 1. Handle CORS Pre-flight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  console.log("--- TRANSCRIBE_AUDIO REQUEST RECEIVED ---");
-
   try {
-    // 2. Safely parse the body and log exactly what was received
-    const body = await req.json().catch(() => null);
-    console.log("Body contents:", JSON.stringify(body));
-
-    // Support multiple casing options for the key to be extra safe
-    const filePath = body?.filePath || body?.filepath || body?.file_path;
+    const body = await req.json().catch(() => null)
+    const filePath = body?.filePath || body?.filepath || body?.file_path
 
     if (!filePath) {
-      console.error("Critical Error: No filePath found in the body provided by Flutter.");
-      throw new Error("Missing filePath in request body");
+      throw new Error('Missing filePath in request body')
     }
 
-    console.log(`Target file: ${filePath}`);
-
-    // 3. Initialize Supabase
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // 4. Download audio
+    // Download the audio file from storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('job-audio')
       .download(filePath)
 
     if (downloadError) {
-      console.error("Supabase Storage Error:", JSON.stringify(downloadError));
-      throw new Error(`Storage error: ${downloadError.message}`);
+      throw new Error(`Storage download failed: ${downloadError.message}`)
     }
 
-    console.log("File downloaded. Calling Deepgram...");
+    const arrayBuf = await fileData.arrayBuffer()
+    const bytes = new Uint8Array(arrayBuf)
 
-    // 5. Transcription using Nova-3
-    const dgResponse = await fetch('https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${DEEPGRAM_API_KEY}`,
-        'Content-Type': 'audio/m4a',
-      },
-      body: fileData,
-    })
+    if (bytes.length < 100) {
+      throw new Error(`Audio file too small (${bytes.length} bytes). Recording may have failed.`)
+    }
+
+    // Detect audio format from header
+    const headerStr = new TextDecoder().decode(bytes.slice(0, 32))
+    const isM4A = headerStr.includes('ftyp')
+    const contentType = isM4A ? 'audio/mp4' : 'audio/wav'
+
+    // Send to Deepgram Nova-3 via raw binary POST (with 25s timeout)
+    const dgController = new AbortController()
+    const dgTimeout = setTimeout(() => dgController.abort(), 25000)
+    let dgResponse: Response
+    try {
+      dgResponse = await fetch(
+        'https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&detect_language=true',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Token ${DEEPGRAM_API_KEY}`,
+            'Content-Type': contentType,
+          },
+          body: arrayBuf,
+          signal: dgController.signal,
+        }
+      )
+    } catch (e) {
+      if (e.name === 'AbortError') throw new Error('Deepgram API timed out after 25s')
+      throw e
+    } finally {
+      clearTimeout(dgTimeout)
+    }
 
     if (!dgResponse.ok) {
-      const errorText = await dgResponse.text();
-      console.error("Deepgram reported an error:", errorText);
-      throw new Error(`Deepgram API returned ${dgResponse.status}`);
+      const errorText = await dgResponse.text()
+      throw new Error(`Deepgram API returned ${dgResponse.status}: ${errorText}`)
     }
 
     const dgResult = await dgResponse.json()
-    const transcript = dgResult?.results?.channels?.[0]?.alternatives?.[0]?.transcript || "";
+    const transcript = dgResult?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ''
 
     if (!transcript || transcript.trim().length === 0) {
-      console.warn("Deepgram processed the audio but found no speech.");
-      throw new Error("Could not hear any speech. Please try speaking closer to the mic.");
+      throw new Error('No speech detected. Please speak closer to the mic.')
     }
 
-    console.log("Success: Transcript generated.");
-
-    // 6. Cleanup storage
+    // Cleanup storage
     await supabase.storage.from('job-audio').remove([filePath])
 
     return new Response(JSON.stringify({ transcript }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 
   } catch (error) {
-    console.error(`Transcribe Crash: ${error.message}`);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

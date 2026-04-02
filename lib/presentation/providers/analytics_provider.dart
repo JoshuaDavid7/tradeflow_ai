@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/repositories/job_repository.dart';
 import '../../data/repositories/expense_repository.dart';
@@ -118,8 +118,9 @@ class AnalyticsNotifier extends StateNotifier<AsyncValue<BusinessAnalytics>> {
           await _materialCostRepository.backfillForUser(_userId!);
           await prefs.setBool(_backfillKey, true);
         }
-      } catch (_) {
+      } catch (e) {
         // Non-fatal — analytics still load without backfill.
+        debugPrint('Material cost backfill failed (non-fatal): $e');
       }
     }
     await loadAnalytics();
@@ -190,8 +191,9 @@ class AnalyticsNotifier extends StateNotifier<AsyncValue<BusinessAnalytics>> {
               linkedMonthly += e.amount;
             }
           }
-        } catch (_) {
+        } catch (e) {
           // If we can't read expenses, fall back to raw totals.
+          debugPrint('Linked expense deduction failed (falling back to raw totals): $e');
         }
       }
 
@@ -362,18 +364,46 @@ final cashFlowTrendProvider = FutureProvider<List<CashFlowData>>((ref) async {
 });
 
 /// Provider for expense breakdown by category — scoped to selected month.
+/// Dedup-aware: subtracts linked expense amounts from their categories and
+/// adds a synthetic "Invoice Materials" category for recognized material costs.
 final expenseByCategoryProvider =
     FutureProvider<Map<String, double>>((ref) async {
   final expenseRepository = ref.watch(expenseRepositoryProvider);
+  final materialCostRepo = ref.watch(materialCostRepositoryProvider);
+  final db = ref.watch(databaseProvider);
   final userId = ref.watch(userIdProvider);
   final month = ref.watch(selectedAnalyticsMonthProvider);
 
   if (userId == null) return {};
 
   try {
-    final stats = await expenseRepository.getExpenseStats(userId, month: month);
-    return Map<String, double>.from(
-        stats['monthlyCategoryTotals'] as Map? ?? {});
+    final allExpenses = await expenseRepository.getAllExpenses(userId);
+    final linkedIds = await materialCostRepo.getLinkedExpenseIds(userId);
+    final activeCosts = await db.materialCostDao.getActiveByUser(userId);
+
+    // Build category totals from standalone expenses only
+    final result = <String, double>{};
+    for (final e in allExpenses) {
+      if (linkedIds.contains(e.id)) continue; // skip linked
+      final d = e.expenseDate.toLocal();
+      if (d.year != month.year || d.month != month.month) continue;
+      final catName = e.category.displayName;
+      result[catName] = (result[catName] ?? 0.0) + e.amount;
+    }
+
+    // Add recognized material costs as their own category
+    double matTotal = 0;
+    for (final c in activeCosts) {
+      final d = c.recognitionDate.toLocal();
+      if (d.year == month.year && d.month == month.month) {
+        matTotal += c.canonicalCost;
+      }
+    }
+    if (matTotal > 0) {
+      result['Invoice Materials'] = matTotal;
+    }
+
+    return result;
   } catch (error, stackTrace) {
     ErrorHandler.handle(error, stackTrace);
     return {};

@@ -24,22 +24,41 @@ enum JobStatus {
 }
 
 /// Material item
+///
+/// Supports quantity × unitPrice for line-item detail.
+/// [cost] is always the total (quantity × unitPrice).
+/// Backward-compatible: old records without quantity default to qty=1.
 class Material {
   final String item;
-  final double cost;
+  final int quantity;
+  final double unitPrice;
+
+  /// Total cost = quantity × unitPrice.
+  double get cost => quantity * unitPrice;
 
   const Material({
     required this.item,
-    required this.cost,
+    this.quantity = 1,
+    required this.unitPrice,
   });
 
-  factory Material.fromJson(Map<String, dynamic> json) => Material(
-        item: json['item']?.toString() ?? '',
-        cost: (json['cost'] as num? ?? 0).toDouble(),
-      );
+  factory Material.fromJson(Map<String, dynamic> json) {
+    final qty = (json['quantity'] as num?)?.toInt() ?? 1;
+    final totalCost = (json['cost'] as num? ?? 0).toDouble();
+    final unit = (json['unitPrice'] as num?)?.toDouble();
+    // Backward compat: if unitPrice missing, derive from cost / qty
+    final effectiveUnitPrice = unit ?? (qty > 0 ? totalCost / qty : totalCost);
+    return Material(
+      item: json['item']?.toString() ?? '',
+      quantity: qty < 1 ? 1 : qty,
+      unitPrice: effectiveUnitPrice,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'item': item,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
         'cost': cost,
       };
 
@@ -49,10 +68,11 @@ class Material {
       other is Material &&
           runtimeType == other.runtimeType &&
           item == other.item &&
-          cost == other.cost;
+          quantity == other.quantity &&
+          unitPrice == other.unitPrice;
 
   @override
-  int get hashCode => item.hashCode ^ cost.hashCode;
+  int get hashCode => item.hashCode ^ quantity.hashCode ^ unitPrice.hashCode;
 }
 
 /// Job domain model
@@ -102,15 +122,22 @@ class Job {
   // ── Payment-state helpers (derived from amounts, not status) ─────────────
 
   /// True when the full invoice amount has been collected.
+  /// The `amountPaid >= totalAmount - 0.01` fallback handles stale
+  /// `amount_due` values in the DB that weren't zeroed after payment.
   bool get isFullyPaid =>
-      totalAmount > 0 && amountPaid > 0.01 && amountDue <= 0.01;
+      totalAmount > 0 &&
+      amountPaid > 0.01 &&
+      (amountDue <= 0.01 || amountPaid >= totalAmount - 0.01);
 
   /// True when some payment has been recorded but the balance isn't settled.
   bool get isPartiallyPaid => amountPaid > 0.01 && !isFullyPaid;
 
   /// True when this is a sent invoice that still has an outstanding balance.
   bool get isAwaitingPayment =>
-      type == JobType.invoice && status == JobStatus.sent && amountDue > 0.01;
+      type == JobType.invoice &&
+      status == JobStatus.sent &&
+      !isFullyPaid &&
+      totalAmount > 0;
 
   /// Calculate labor cost
   double get laborCost => laborHours * hourlyRateAtTime;

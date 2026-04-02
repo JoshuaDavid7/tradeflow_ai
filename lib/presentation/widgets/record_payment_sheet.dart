@@ -165,7 +165,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Payment failed: $e'),
+            content: Text(_userFriendlyError(e)),
             backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             shape:
@@ -256,7 +256,7 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
 
                   // Payment method
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedMethod,
+                    value: _selectedMethod,
                     decoration: InputDecoration(
                       labelText: 'Payment Method',
                       prefixIcon: const Icon(Icons.payment),
@@ -448,6 +448,24 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
       height: 32,
       color: colorScheme.outlineVariant.withValues(alpha: 0.5),
     );
+  }
+
+  /// Convert an exception to a user-friendly error message.
+  String _userFriendlyError(dynamic e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('socketexception') || msg.contains('no internet') || msg.contains('network')) {
+      return 'No internet connection. Please check your network and try again.';
+    }
+    if (msg.contains('timeout')) {
+      return 'Request timed out. Please try again.';
+    }
+    if (msg.contains('invalid_status') || msg.contains('cancelled')) {
+      return 'This invoice has been cancelled and cannot accept payments.';
+    }
+    if (msg.contains('zero_total') || msg.contains('\$0')) {
+      return 'This invoice has a \$0 balance and cannot accept payments.';
+    }
+    return 'Payment could not be recorded. Please try again.';
   }
 
   /// Live-updating remaining balance preview below the amount field.

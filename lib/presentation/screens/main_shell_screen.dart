@@ -83,6 +83,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         indicatorColor: colorScheme.primaryContainer,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         onDestinationSelected: (index) {
+          // Clear the outstanding-only filter when navigating away from
+          // the Jobs tab so it doesn't persist on next visit.
+          if (index != 1 && ref.read(historyOutstandingFilterProvider)) {
+            ref.read(historyOutstandingFilterProvider.notifier).state = false;
+          }
           ref.read(bottomNavIndexProvider.notifier).state = index;
         },
         destinations: const [

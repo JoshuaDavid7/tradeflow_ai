@@ -606,8 +606,26 @@ class JobRepository implements IJobRepository {
         throw DatabaseException(message: 'Job not found on remote', code: 'NOT_FOUND');
       }
 
+      // Guard: prevent payments on cancelled/superseded invoices
+      final jobStatus = (jobRow['status']?.toString().toLowerCase()) ?? '';
+      if (jobStatus == 'cancelled' || jobStatus == 'superseded') {
+        throw BusinessException(
+          message: 'Cannot record a payment on a ${jobStatus} invoice.',
+          code: 'INVALID_STATUS',
+        );
+      }
+
       final userId = jobRow['user_id']?.toString() ?? '';
       final totalAmount = _asDouble(jobRow['total_amount']);
+
+      // Guard: prevent payments on $0 invoices
+      if (totalAmount <= 0) {
+        throw BusinessException(
+          message: 'Cannot record a payment on a \$0 invoice.',
+          code: 'ZERO_TOTAL',
+        );
+      }
+
       final currentPaid = _asDouble(jobRow['amount_paid']);
 
       // 2. Compute new totals
@@ -775,10 +793,13 @@ class JobRepository implements IJobRepository {
             ? total
             : 0.0;
     final rawDue = _asDouble(row['amount_due']);
-    final amountDue = rawDue > 0
-        ? rawDue
-        : (normalizedAmountPaid >= total - 0.01 && total > 0)
-            ? 0.0
+    // Fully-paid override: when amountPaid covers the total, force
+    // amountDue to 0 regardless of stale DB values.  This keeps the
+    // Job model consistent with getJobStats's isFullyPaid logic.
+    final amountDue = (normalizedAmountPaid >= total - 0.01 && total > 0)
+        ? 0.0
+        : rawDue > 0
+            ? rawDue
             : total - normalizedAmountPaid;
 
     return domain.Job(
@@ -848,10 +869,20 @@ class JobRepository implements IJobRepository {
     if (raw is List) {
       return raw
           .whereType<Map>()
-          .map((item) => domain.Material(
-                item: item['item']?.toString() ?? 'Item',
-                cost: _asDouble(item['cost']),
-              ))
+          .map((item) {
+            final qty = (item['quantity'] as num?)?.toInt()
+                ?? (item['qty'] as num?)?.toInt() ?? 1;
+            final cost = _asDouble(item['cost']);
+            final unitPrice = (item['unitPrice'] as num?)?.toDouble()
+                ?? (qty > 0 ? cost / qty : cost);
+            final name = item['item']?.toString()
+                ?? item['name']?.toString() ?? 'Item';
+            return domain.Material(
+              item: name,
+              quantity: qty < 1 ? 1 : qty,
+              unitPrice: unitPrice,
+            );
+          })
           .toList();
     }
     return const [];
@@ -864,7 +895,7 @@ class JobRepository implements IJobRepository {
     final items = materials.map((m) {
       // Escape quotes in item name
       final escapedItem = m.item.replaceAll('"', '\\"');
-      return '{"item":"$escapedItem","cost":${m.cost}}';
+      return '{"item":"$escapedItem","quantity":${m.quantity},"unitPrice":${m.unitPrice},"cost":${m.cost}}';
     }).join(',');
 
     return '[$items]';
@@ -894,7 +925,14 @@ class JobRepository implements IJobRepository {
         if (itemMatch != null && costMatch != null) {
           final item = itemMatch.group(1)!.replaceAll('\\"', '"');
           final cost = double.parse(costMatch.group(1)!);
-          items.add(domain.Material(item: item, cost: cost));
+          final qtyMatch = RegExp(r'"quantity":([0-9]+)').firstMatch(clean);
+          final unitMatch = RegExp(r'"unitPrice":([0-9.]+)').firstMatch(clean);
+          final qty = qtyMatch != null ? int.parse(qtyMatch.group(1)!) : 1;
+          final unitPrice = unitMatch != null
+              ? double.parse(unitMatch.group(1)!)
+              : (qty > 0 ? cost / qty : cost);
+          items.add(domain.Material(
+              item: item, quantity: qty, unitPrice: unitPrice));
         }
       }
 

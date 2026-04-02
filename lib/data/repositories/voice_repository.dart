@@ -27,17 +27,25 @@ class VoiceRepository implements IVoiceRepository {
       final platform = Platform.isIOS ? 'ios' : 'android';
       final storagePath = '$platform/$fileName';
 
-      // Upload to storage
+      // Read file as bytes to ensure complete binary upload
+      final bytes = await file.readAsBytes();
+
+      ErrorHandler.debug('Audio file read', {
+        'path': file.path,
+        'bytesLength': bytes.length,
+      });
+
+      // Upload raw bytes to storage
       await _supabase.uploadFile(
         bucket: 'job-audio',
         path: storagePath,
-        file: file,
-        contentType: 'audio/m4a',
+        file: bytes,
+        contentType: 'audio/mp4',
       );
 
       ErrorHandler.debug('Audio uploaded successfully', {
         'path': storagePath,
-        'size': await file.length(),
+        'size': bytes.length,
       });
 
       return storagePath;
@@ -45,15 +53,22 @@ class VoiceRepository implements IVoiceRepository {
       ErrorHandler.handle(error, stackTrace);
 
       if (error is AuthException || error is NetworkException) {
+        final appError = error as AppException;
         throw VoiceCaptureException(
-          message: (error as AppException).message,
-          code: (error as AppException).code,
+          message: appError.message,
+          code: appError.code,
           originalError: error,
           stackTrace: stackTrace,
         );
       }
 
-      throw VoiceCaptureException.uploadFailed();
+      // Pass through the actual error message for debugging
+      throw VoiceCaptureException(
+        message: 'Upload failed: $error',
+        code: 'UPLOAD_FAILED',
+        originalError: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -69,7 +84,8 @@ class VoiceRepository implements IVoiceRepository {
 
       if (transcript == null || transcript.trim().isEmpty) {
         throw VoiceCaptureException(
-          message: 'Could not understand the audio. Please speak clearly and try again.',
+          message:
+              'Could not understand the audio. Please speak clearly and try again.',
           code: 'EMPTY_TRANSCRIPT',
         );
       }
@@ -81,7 +97,7 @@ class VoiceRepository implements IVoiceRepository {
       return transcript;
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);
-      
+
       if (error is VoiceCaptureException) {
         rethrow;
       }
@@ -95,7 +111,7 @@ class VoiceRepository implements IVoiceRepository {
           stackTrace: stackTrace,
         );
       }
-      
+
       throw VoiceCaptureException.transcriptionFailed();
     }
   }
@@ -108,28 +124,20 @@ class VoiceRepository implements IVoiceRepository {
         body: {'transcript': transcript},
       );
 
-      // The response should be the extracted job data
-      if (response is Map<String, dynamic>) {
-        ErrorHandler.debug('Job data extracted', {
-          'hasClient': response.containsKey('clientName'),
-          'hasMaterials': response.containsKey('materials'),
-        });
-
-        return response;
-      }
-
       // If response is wrapped in 'result' key
       if (response.containsKey('result') && response['result'] is Map) {
         return response['result'] as Map<String, dynamic>;
       }
 
-      throw VoiceCaptureException(
-        message: 'Failed to extract job details from audio',
-        code: 'INVALID_EXTRACTION',
-      );
+      ErrorHandler.debug('Job data extracted', {
+        'hasClient': response.containsKey('clientName'),
+        'hasMaterials': response.containsKey('materials'),
+      });
+
+      return response;
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);
-      
+
       if (error is VoiceCaptureException) {
         rethrow;
       }
@@ -143,7 +151,7 @@ class VoiceRepository implements IVoiceRepository {
           stackTrace: stackTrace,
         );
       }
-      
+
       throw VoiceCaptureException.extractionFailed();
     }
   }

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,7 +45,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   Future<bool> _tableExists(String tableName) async {
     final rows = await customSelect(
@@ -94,6 +95,21 @@ class AppDatabase extends _$AppDatabase {
       'material_id',
       'ALTER TABLE recognized_material_costs ADD COLUMN material_id TEXT',
     );
+    await _ensureColumnSql(
+      'business_settings',
+      'quote_prefix',
+      'ALTER TABLE business_settings ADD COLUMN quote_prefix TEXT',
+    );
+    await _ensureColumnSql(
+      'business_settings',
+      'default_due_days',
+      'ALTER TABLE business_settings ADD COLUMN default_due_days INTEGER NOT NULL DEFAULT 14',
+    );
+    await _ensureColumnSql(
+      'business_settings',
+      'default_markup_percent',
+      'ALTER TABLE business_settings ADD COLUMN default_markup_percent REAL NOT NULL DEFAULT 0.0',
+    );
   }
 
   @override
@@ -115,6 +131,24 @@ class AppDatabase extends _$AppDatabase {
         if (from < 3) {
           await m.createTable(recognizedMaterialCosts);
           await m.createTable(materialCostLinks);
+        }
+        if (from < 6) {
+          // Add document default columns to business_settings
+          await _ensureColumnSql(
+            'business_settings',
+            'quote_prefix',
+            "ALTER TABLE business_settings ADD COLUMN quote_prefix TEXT",
+          );
+          await _ensureColumnSql(
+            'business_settings',
+            'default_due_days',
+            "ALTER TABLE business_settings ADD COLUMN default_due_days INTEGER NOT NULL DEFAULT 14",
+          );
+          await _ensureColumnSql(
+            'business_settings',
+            'default_markup_percent',
+            "ALTER TABLE business_settings ADD COLUMN default_markup_percent REAL NOT NULL DEFAULT 0.0",
+          );
         }
       },
       beforeOpen: (details) async {
@@ -147,7 +181,8 @@ LazyDatabase _openConnection() {
     Directory dbFolder;
     try {
       dbFolder = await getApplicationDocumentsDirectory();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('getApplicationDocumentsDirectory failed, using temp dir fallback: $e');
       // Fallback: derive the app's Documents dir from the temp directory.
       // On iOS / simulators, Directory.systemTemp resolves to
       //   <app-sandbox>/tmp  –  so we go up one level to reach the sandbox

@@ -56,6 +56,64 @@ class AppColors {
   static const noteTeal = Color(0xFF006B5E);
 }
 
+// ─── Typography Tokens ──────────────────────────────────────────────────────
+/// Centralized text style tokens for cross-screen consistency.
+/// Reference direction: Jobs screen (compact, operational, confident).
+///
+/// Usage: `AppTextStyles.sectionHeader(textTheme)` in build methods
+/// where `textTheme = Theme.of(context).textTheme`.
+class AppTextStyles {
+  AppTextStyles._();
+
+  // ── Section Headers ────────────────────────────────────────────────
+  /// Dashboard section headers: "Urgent", "Recent Jobs", etc.
+  static TextStyle sectionHeader(TextTheme t) =>
+      t.titleMedium!.copyWith(fontWeight: FontWeight.w700);
+
+  // ── Card Content ───────────────────────────────────────────────────
+  /// Primary card title — client name, item name. 14/w700.
+  static TextStyle cardTitle(TextTheme t) =>
+      t.titleSmall!.copyWith(fontWeight: FontWeight.w700);
+
+  /// Card subtitle — description, metadata line. 12/w400 muted.
+  static TextStyle cardSubtitle(TextTheme t, ColorScheme c) =>
+      t.bodySmall!.copyWith(color: c.onSurfaceVariant);
+
+  /// Card amount — money values. 14/w800 for scannable emphasis.
+  static TextStyle cardAmount(TextTheme t) =>
+      t.titleSmall!.copyWith(fontWeight: FontWeight.w800);
+
+  // ── Badges ─────────────────────────────────────────────────────────
+  /// Status / type badge text. 10/w800.
+  static TextStyle badge(Color color) =>
+      TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w800);
+
+  // ── Action Chips ───────────────────────────────────────────────────
+  /// Inline action chip label. 11/w700.
+  static TextStyle chipLabel(Color color) =>
+      TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700);
+
+  // ── Metadata ───────────────────────────────────────────────────────
+  /// Date, timestamp, secondary info. bodySmall muted.
+  static TextStyle metadata(TextTheme t, ColorScheme c) =>
+      t.bodySmall!.copyWith(color: c.onSurfaceVariant);
+
+  // ── Sheet Titles ───────────────────────────────────────────────────
+  /// Bottom sheet / dialog titles. 16/w700.
+  static TextStyle sheetTitle(TextTheme t) =>
+      t.titleMedium!.copyWith(fontWeight: FontWeight.w700);
+
+  // ── Empty States ───────────────────────────────────────────────────
+  static TextStyle emptyTitle(TextTheme t, ColorScheme c) =>
+      t.titleSmall!.copyWith(
+        color: c.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      );
+
+  static TextStyle emptyBody(TextTheme t, ColorScheme c) =>
+      t.bodySmall!.copyWith(color: c.onSurfaceVariant);
+}
+
 // ─── Light Theme ───────────────────────────────────────────────────────────
 
 ThemeData buildLightTheme() {
@@ -198,15 +256,16 @@ ThemeData buildLightTheme() {
       space: 0,
     ),
 
-    // Tab bar
+    // Tab bar — 12px operational, w800 selected for confident active state
     tabBarTheme: TabBarThemeData(
       indicatorColor: colorScheme.primary,
       labelColor: colorScheme.primary,
-      unselectedLabelColor: colorScheme.onSurfaceVariant,
+      unselectedLabelColor:
+          colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
       labelStyle:
-          const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
       unselectedLabelStyle:
-          const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+          const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
     ),
 
     // Bottom sheet
@@ -394,15 +453,16 @@ ThemeData buildDarkTheme() {
       space: 0,
     ),
 
-    // Tab bar
+    // Tab bar — 12px operational, w800 selected for confident active state
     tabBarTheme: TabBarThemeData(
       indicatorColor: colorScheme.primary,
       labelColor: colorScheme.primary,
-      unselectedLabelColor: colorScheme.onSurfaceVariant,
+      unselectedLabelColor:
+          colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
       labelStyle:
-          const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
       unselectedLabelStyle:
-          const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+          const TextStyle(fontWeight: FontWeight.w500, fontSize: 12),
     ),
 
     // Bottom sheet

@@ -11,6 +11,13 @@ class BusinessProfile {
   final bool isPro;
   final String subscriptionStatus;
 
+  // Document defaults
+  final String invoicePrefix;
+  final String quotePrefix;
+  final int nextInvoiceNumber;
+  final int defaultDueDays;
+  final double defaultMarkupPercent;
+
   BusinessProfile({
     required this.id,
     required this.businessName,
@@ -23,6 +30,11 @@ class BusinessProfile {
     required this.currencySymbol,
     this.isPro = false,
     this.subscriptionStatus = 'none',
+    this.invoicePrefix = 'INV',
+    this.quotePrefix = 'QUO',
+    this.nextInvoiceNumber = 1,
+    this.defaultDueDays = 14,
+    this.defaultMarkupPercent = 0.0,
   });
 
   factory BusinessProfile.fromJson(Map<String, dynamic> json) => BusinessProfile(
@@ -37,5 +49,10 @@ class BusinessProfile {
         currencySymbol: json['currency_symbol']?.toString() ?? '\$',
         isPro: json['is_pro'] as bool? ?? false,
         subscriptionStatus: json['subscription_status']?.toString() ?? 'none',
+        invoicePrefix: json['invoice_prefix']?.toString() ?? 'INV',
+        quotePrefix: json['quote_prefix']?.toString() ?? 'QUO',
+        nextInvoiceNumber: (json['next_invoice_number'] as num?)?.toInt() ?? 1,
+        defaultDueDays: (json['default_due_days'] as num?)?.toInt() ?? 14,
+        defaultMarkupPercent: (json['default_markup_percent'] as num?)?.toDouble() ?? 0.0,
       );
 }

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/errors/app_exception.dart';
 import '../../core/errors/error_handler.dart';
 import '../../core/utils/retry_util.dart';
@@ -76,6 +75,12 @@ class VoiceCaptureProgress {
 
 /// Enhanced voice capture service with retry, offline queue, and progress tracking
 class VoiceCaptureService {
+  static const int _minimumRecordingBytes = 1000;
+  static const Duration _recordingFinalizeTimeout = Duration(seconds: 3);
+  static const Duration _recordingFinalizePollInterval =
+      Duration(milliseconds: 150);
+  static const Duration _minimumRecordingDuration = Duration(seconds: 1);
+
   final AudioRecorder _recorder = AudioRecorder();
   final IVoiceRepository _repository;
   final ConnectivityService _connectivity;
@@ -83,7 +88,7 @@ class VoiceCaptureService {
   String? _currentPath;
   Timer? _recordingTimer;
   DateTime? _recordingStartTime;
-  
+
   // Progress callback
   void Function(VoiceCaptureProgress)? onProgress;
 
@@ -93,7 +98,7 @@ class VoiceCaptureService {
   Future<void> startRecording() async {
     try {
       _updateProgress(
-        VoiceCaptureProgress(
+        const VoiceCaptureProgress(
           state: VoiceCaptureState.recording,
           progress: 0.0,
           message: 'Requesting microphone permission...',
@@ -108,21 +113,48 @@ class VoiceCaptureService {
 
       // Get temporary directory
       final tempDir = await getTemporaryDirectory();
-      _currentPath = '${tempDir.path}/job_capture_${DateTime.now().millisecondsSinceEpoch}.m4a';
+      _currentPath =
+          '${tempDir.path}/job_capture_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
       // Configure recording
       const config = RecordConfig(
         encoder: AudioEncoder.aacLc,
         bitRate: 128000,
         sampleRate: 44100,
+        numChannels: 1,
+        iosConfig: IosRecordConfig(
+          categoryOptions: [
+            IosAudioCategoryOption.defaultToSpeaker,
+            IosAudioCategoryOption.allowBluetooth,
+            IosAudioCategoryOption.allowBluetoothA2DP,
+            IosAudioCategoryOption.overrideMutedMicrophoneInterruption,
+          ],
+        ),
       );
+
+      // Check recorder permission at native level
+      final hasPermission = await _recorder.hasPermission();
+      if (!hasPermission) {
+        throw VoiceCaptureException.permissionDenied();
+      }
 
       // Start recording
       await _recorder.start(config, path: _currentPath!);
+
+      // Verify recording state
+      var isRecording = await _recorder.isRecording();
+      if (!isRecording) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        isRecording = await _recorder.isRecording();
+      }
+      if (!isRecording) {
+        throw VoiceCaptureException.recordingFailed();
+      }
+
       _recordingStartTime = DateTime.now();
 
       _updateProgress(
-        VoiceCaptureProgress(
+        const VoiceCaptureProgress(
           state: VoiceCaptureState.recording,
           progress: 0.1,
           message: 'Recording... Speak clearly about the job',
@@ -154,11 +186,12 @@ class VoiceCaptureService {
       if (_recordingStartTime != null) {
         final duration = DateTime.now().difference(_recordingStartTime!);
         final seconds = duration.inSeconds;
-        
+
         _updateProgress(
           VoiceCaptureProgress(
             state: VoiceCaptureState.recording,
-            progress: 0.1 + (seconds / 300.0) * 0.1, // Max 30 seconds contribution
+            progress:
+                0.1 + (seconds / 300.0) * 0.1, // Max 30 seconds contribution
             message: 'Recording... ${seconds}s',
           ),
         );
@@ -168,57 +201,80 @@ class VoiceCaptureService {
 
   /// Stop recording and process with full pipeline
   Future<VoiceCaptureResult> stopAndProcess() async {
+    File? recordedFile;
+
     try {
       // Stop recording timer
       _recordingTimer?.cancel();
 
       _updateProgress(
-        VoiceCaptureProgress(
+        const VoiceCaptureProgress(
           state: VoiceCaptureState.processing,
           progress: 0.2,
           message: 'Stopping recording...',
         ),
       );
 
-      final path = await _recorder.stop();
+      final path = await _recorder.stop() ?? _currentPath;
       if (path == null) {
         throw VoiceCaptureException.recordingFailed();
       }
 
-      final file = File(path);
-      if (!await file.exists()) {
+      recordedFile = File(path);
+      if (!await recordedFile.exists()) {
         throw VoiceCaptureException.recordingFailed();
       }
 
+      final recordingDuration = _recordingStartTime == null
+          ? Duration.zero
+          : DateTime.now().difference(_recordingStartTime!);
+      final fileSize = await _awaitFinalizedRecordingSize(recordedFile);
       ErrorHandler.info('Recording stopped', {
         'path': path,
-        'size': await file.length(),
+        'size': fileSize,
+        'durationMs': recordingDuration.inMilliseconds,
       });
+
+      // Validate recording has actual audio data
+      if (fileSize < _minimumRecordingBytes) {
+        final durationSeconds =
+            (recordingDuration.inMilliseconds / 1000).toStringAsFixed(1);
+        final message = recordingDuration < _minimumRecordingDuration
+            ? 'Recording was stopped too quickly (${durationSeconds}s). '
+                'Please speak for at least 2 seconds before tapping stop.'
+            : 'Recording did not capture usable audio ($fileSize bytes after waiting). '
+                'Please make sure the microphone is available and try again.';
+        throw VoiceCaptureException(
+          message: message,
+          code: 'EMPTY_RECORDING',
+        );
+      }
 
       // Check connectivity
       if (_connectivity.isOffline) {
         // Queue for later processing
-        await _queueForLater(file);
+        await _queueForLater(recordedFile);
         throw NetworkException(
-          message: 'No internet connection. Recording saved for later processing.',
+          message:
+              'No internet connection. Recording saved for later processing.',
           code: 'OFFLINE_QUEUED',
         );
       }
 
       // Upload with progress
       _updateProgress(
-        VoiceCaptureProgress(
+        const VoiceCaptureProgress(
           state: VoiceCaptureState.uploading,
           progress: 0.3,
           message: 'Uploading audio...',
         ),
       );
 
-      final storagePath = await _uploadWithRetry(file);
+      final storagePath = await _uploadWithRetry(recordedFile);
 
       // Transcribe with progress
       _updateProgress(
-        VoiceCaptureProgress(
+        const VoiceCaptureProgress(
           state: VoiceCaptureState.transcribing,
           progress: 0.5,
           message: 'Transcribing speech...',
@@ -229,23 +285,39 @@ class VoiceCaptureService {
 
       // Extract job data with progress
       _updateProgress(
-        VoiceCaptureProgress(
+        const VoiceCaptureProgress(
           state: VoiceCaptureState.extracting,
           progress: 0.8,
           message: 'Extracting job details...',
         ),
       );
 
-      final extractedData = await _extractWithRetry(transcript);
+      Map<String, dynamic> extractedData;
+      try {
+        extractedData = await _extractWithRetry(transcript);
+      } catch (error) {
+        ErrorHandler.warning(
+          'Voice extraction failed, using transcript fallback',
+          {
+            'error': error.toString(),
+            'transcriptLength': transcript.length,
+          },
+        );
+        extractedData = _buildFallbackDraftFromTranscript(transcript);
+      }
 
       // Cleanup
-      await file.delete();
+      await recordedFile.delete();
+      recordedFile = null;
 
       _updateProgress(
         VoiceCaptureProgress(
           state: VoiceCaptureState.completed,
           progress: 1.0,
-          message: 'Job details extracted successfully!',
+          message: extractedData['materials'] is List &&
+                  (extractedData['materials'] as List).isEmpty
+              ? 'Transcript ready. Review the draft details.'
+              : 'Job details extracted successfully!',
         ),
       );
 
@@ -258,10 +330,9 @@ class VoiceCaptureService {
       );
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);
-      
-      final errorMessage = error is AppException
-          ? error.message
-          : 'Failed to process recording';
+
+      final errorMessage =
+          error is AppException ? error.message : 'Failed to process recording';
 
       _updateProgress(
         VoiceCaptureProgress(
@@ -271,7 +342,93 @@ class VoiceCaptureService {
       );
 
       rethrow;
+    } finally {
+      _recordingStartTime = null;
+      _currentPath = null;
+
+      if (recordedFile != null) {
+        try {
+          if (await recordedFile.exists()) {
+            await recordedFile.delete();
+          }
+        } catch (_) {
+          // Best-effort cleanup only.
+        }
+      }
     }
+  }
+
+  Future<int> _awaitFinalizedRecordingSize(File file) async {
+    if (Platform.isIOS) {
+      await Future.delayed(const Duration(milliseconds: 250));
+    }
+
+    final stopwatch = Stopwatch()..start();
+    var lastSize = -1;
+    var stableReadCount = 0;
+
+    while (stopwatch.elapsed < _recordingFinalizeTimeout) {
+      if (!await file.exists()) {
+        await Future.delayed(_recordingFinalizePollInterval);
+        continue;
+      }
+
+      final currentSize = await file.length();
+      if (currentSize == lastSize) {
+        stableReadCount++;
+      } else {
+        stableReadCount = 0;
+        lastSize = currentSize;
+      }
+
+      final isStable = stableReadCount >= 2;
+      if (currentSize >= _minimumRecordingBytes && isStable) {
+        return currentSize;
+      }
+
+      if (currentSize > _minimumRecordingBytes * 4) {
+        return currentSize;
+      }
+
+      await Future.delayed(_recordingFinalizePollInterval);
+    }
+
+    return (await file.exists()) ? await file.length() : 0;
+  }
+
+  Map<String, dynamic> _buildFallbackDraftFromTranscript(String transcript) {
+    final cleanedTranscript = transcript.trim();
+
+    return {
+      'clientName': '',
+      'type': _inferDocumentType(cleanedTranscript),
+      'description': cleanedTranscript,
+      'laborHours': _inferLaborHours(cleanedTranscript),
+      'laborType': 'profile',
+      'materials': <Map<String, dynamic>>[],
+      'voiceTranscript': cleanedTranscript,
+    };
+  }
+
+  String _inferDocumentType(String transcript) {
+    final normalized = transcript.toLowerCase();
+    if (normalized.contains('quote') || normalized.contains('estimate')) {
+      return 'quote';
+    }
+    return 'invoice';
+  }
+
+  double _inferLaborHours(String transcript) {
+    final match = RegExp(
+      r'(\d+(?:\.\d+)?)\s*(?:hour|hours|hr|hrs)\b',
+      caseSensitive: false,
+    ).firstMatch(transcript);
+
+    if (match == null) {
+      return 1.0;
+    }
+
+    return double.tryParse(match.group(1) ?? '') ?? 1.0;
   }
 
   /// Upload file with retry logic
@@ -295,7 +452,7 @@ class VoiceCaptureService {
   Future<String> _transcribeWithRetry(String storagePath) async {
     return RetryUtil.retry(
       () => _repository.transcribeAudio(storagePath),
-      config: const RetryConfig.aggressive(),
+      config: const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
       onRetry: (attempt, error) {
         _updateProgress(
           VoiceCaptureProgress(
@@ -312,7 +469,7 @@ class VoiceCaptureService {
   Future<Map<String, dynamic>> _extractWithRetry(String transcript) async {
     return RetryUtil.retry(
       () => _repository.extractJobData(transcript),
-      config: const RetryConfig(),
+      config: const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
       onRetry: (attempt, error) {
         _updateProgress(
           VoiceCaptureProgress(
@@ -335,11 +492,12 @@ class VoiceCaptureService {
         await queueDir.create(recursive: true);
       }
 
-      final queuedPath = '${queueDir.path}/${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final queuedPath =
+          '${queueDir.path}/${DateTime.now().millisecondsSinceEpoch}.m4a';
       await file.copy(queuedPath);
 
       ErrorHandler.info('Recording queued for later', {'path': queuedPath});
-    } catch (error, stackTrace) {
+    } catch (error) {
       ErrorHandler.warning('Failed to queue recording', {'error': error});
     }
   }
@@ -356,7 +514,8 @@ class VoiceCaptureService {
         return results;
       }
 
-      final files = await queueDir.list().where((e) => e.path.endsWith('.m4a')).toList();
+      final files =
+          await queueDir.list().where((e) => e.path.endsWith('.m4a')).toList();
 
       for (final file in files) {
         try {
@@ -396,7 +555,7 @@ class VoiceCaptureService {
     try {
       _recordingTimer?.cancel();
       await _recorder.stop();
-      
+
       if (_currentPath != null) {
         final file = File(_currentPath!);
         if (await file.exists()) {
@@ -404,13 +563,16 @@ class VoiceCaptureService {
         }
       }
 
+      _recordingStartTime = null;
+      _currentPath = null;
+
       _updateProgress(
         const VoiceCaptureProgress(
           state: VoiceCaptureState.idle,
           message: 'Recording cancelled',
         ),
       );
-    } catch (error, stackTrace) {
+    } catch (error) {
       ErrorHandler.warning('Failed to cancel recording', {'error': error});
     }
   }

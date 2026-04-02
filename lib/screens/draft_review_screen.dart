@@ -20,6 +20,8 @@ import '../presentation/providers/customer_ledger_provider.dart';
 import '../presentation/providers/voice_provider.dart';
 import '../data/services/voice_capture_service.dart';
 import '../data/repositories/material_cost_repository.dart';
+import '../domain/models/expense.dart';
+import '../presentation/providers/expense_provider.dart';
 import 'pdf_preview_screen.dart';
 
 class DraftReviewScreen extends StatefulWidget {
@@ -118,7 +120,10 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     _loadCustomers();
 
     // Track unsaved changes
-    void markDirty() { if (!_isDirty) setState(() => _isDirty = true); }
+    void markDirty() {
+      if (!_isDirty) setState(() => _isDirty = true);
+    }
+
     _clientCtrl.addListener(markDirty);
     _clientAddressCtrl.addListener(markDirty);
     _clientPhoneCtrl.addListener(markDirty);
@@ -140,13 +145,18 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           .eq('user_id', userId)
           .order('name');
       if (mounted) {
+        final customers = List<Map<String, dynamic>>.from(data as List)
+          ..sort((a, b) => (a['name']?.toString().trim().toLowerCase() ?? '')
+              .compareTo(b['name']?.toString().trim().toLowerCase() ?? ''));
         setState(() {
-          _customers = List<Map<String, dynamic>>.from(data as List);
+          _customers = customers;
         });
         // Auto-match existing customer if client name matches
         _autoMatchCustomer();
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Worksheet: customer list fetch failed: $e');
+    }
   }
 
   void _autoMatchCustomer() {
@@ -213,7 +223,9 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 
   String _sanitizeInvoicePrefix(String? rawPrefix) {
     final isQuote = (_editableData['type']?.toString() ?? 'invoice') == 'quote';
-    final fallback = isQuote ? 'QUO' : 'INV';
+    final fallback = isQuote
+        ? (_profile?.quotePrefix ?? 'QUO')
+        : (_profile?.invoicePrefix ?? 'INV');
     final cleaned = (rawPrefix ?? '')
         .trim()
         .toUpperCase()
@@ -232,7 +244,9 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final id = (rawId ?? '').trim();
     if (id.length < 8) return '';
     final isQuote = (_editableData['type']?.toString() ?? 'invoice') == 'quote';
-    final prefix = isQuote ? 'QUO' : 'INV';
+    final prefix = isQuote
+        ? (_profile?.quotePrefix ?? 'QUO')
+        : (_profile?.invoicePrefix ?? 'INV');
     return '$prefix-${id.substring(0, 6).toUpperCase()}';
   }
 
@@ -248,7 +262,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     try {
       final row = await _supabase
           .from('profiles')
-          .select('invoice_prefix, next_invoice_number')
+          .select('invoice_prefix, quote_prefix, next_invoice_number')
           .eq('id', userId)
           .maybeSingle();
 
@@ -256,7 +270,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       final isQuote =
           (_editableData['type']?.toString() ?? 'invoice') == 'quote';
       final prefix = isQuote
-          ? 'QUO'
+          ? _sanitizeInvoicePrefix(row?['quote_prefix']?.toString())
           : _sanitizeInvoicePrefix(row?['invoice_prefix']?.toString());
       final previewNumber =
           _formatInvoiceNumber(sequence: nextNumber, prefix: prefix);
@@ -267,8 +281,9 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
         _editableData['invoiceNumber'] = previewNumber;
         _editableData['invoice_number'] = previewNumber;
       });
-    } catch (_) {
+    } catch (e) {
       // Non-blocking: if migration isn't applied yet, user can still type manually.
+      debugPrint('Invoice number preview failed (non-blocking): $e');
     }
   }
 
@@ -301,7 +316,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       final isQuote =
           (_editableData['type']?.toString() ?? 'invoice') == 'quote';
       final prefix = isQuote
-          ? 'QUO'
+          ? _sanitizeInvoicePrefix(payload['quote_prefix']?.toString())
           : _sanitizeInvoicePrefix(payload['invoice_prefix']?.toString());
       final generatedNumber =
           _formatInvoiceNumber(sequence: sequence, prefix: prefix);
@@ -335,7 +350,15 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
         .eq('id', userId)
         .maybeSingle();
     if (data != null && mounted) {
-      setState(() => _profile = BusinessProfile.fromJson(data));
+      final profile = BusinessProfile.fromJson(data);
+      setState(() {
+        _profile = profile;
+        // Apply default markup from profile if user hasn't changed it
+        if (_markupPercent == 0.0 && profile.defaultMarkupPercent > 0) {
+          _markupPercent = profile.defaultMarkupPercent;
+          _markupCtrl.text = profile.defaultMarkupPercent.toString();
+        }
+      });
     }
   }
 
@@ -347,8 +370,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           _includeStripePayment = _isStripeEnabledInTemplate(template);
         });
       }
-    } catch (_) {
-      // Template load failed — keep default (false)
+    } catch (e) {
+      debugPrint('Template load failed, keeping defaults: $e');
     }
     // Check Stripe availability in background
     _checkStripeAvailability();
@@ -358,7 +381,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     try {
       final result = await PaymentService.checkStripeAvailability();
       if (mounted) setState(() => _stripeAvailability = result);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Stripe availability check failed: $e');
       if (mounted) setState(() => _stripeAvailability = 'unknown_error');
     }
   }
@@ -387,8 +411,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   double _effectiveHourlyRate() {
     final type = _editableData['laborType'] ?? 'profile';
     if (type == 'hourly') {
-      return double.tryParse(
-              _editableData['laborRate']?.toString() ?? '0') ??
+      return double.tryParse(_editableData['laborRate']?.toString() ?? '0') ??
           (_profile?.hourlyRate ?? 85.0);
     }
     return _profile?.hourlyRate ?? 85.0;
@@ -424,7 +447,10 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 
   Map<String, dynamic> _buildCurrentPdfData() {
     _syncEditableFromControllers();
-    return Map<String, dynamic>.from(_editableData);
+    final data = Map<String, dynamic>.from(_editableData);
+    // Pass default due days so PDF uses the configured payment term
+    data['default_due_days'] = _profile?.defaultDueDays ?? 14;
+    return data;
   }
 
   Map<String, dynamic> _buildJobPayload({required String userId}) {
@@ -574,8 +600,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       container.invalidate(jobListProvider);
       container.invalidate(customerLedgerListProvider);
       container.read(analyticsProvider.notifier).refresh();
-    } catch (_) {
-      // ProviderScope not available — ignore
+    } catch (e) {
+      debugPrint('Provider invalidation failed: $e');
     }
   }
 
@@ -596,8 +622,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
             .update({'updated_at': DateTime.now().toIso8601String()})
             .eq('id', existingCustomerId)
             .eq('user_id', userId);
-      } catch (_) {
-        // Non-critical
+      } catch (e) {
+        debugPrint('Customer timestamp update failed (non-critical): $e');
       }
       return;
     }
@@ -643,7 +669,9 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               .insert(fullPayload)
               .select('id')
               .single();
-        } catch (_) {
+        } catch (e) {
+          debugPrint(
+              'Customer insert with all columns failed, retrying without optional columns: $e');
           // Fallback: columns from migration might not exist yet
           fullPayload.remove('total_billed');
           fullPayload.remove('total_paid');
@@ -684,7 +712,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Discard Changes?'),
-        content: const Text('You have unsaved changes. Are you sure you want to go back?'),
+        content: const Text(
+            'You have unsaved changes. Are you sure you want to go back?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -692,7 +721,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Discard', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text('Discard',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -722,7 +752,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Could not save. Please check your connection and try again.'),
+          content: const Text(
+              'Could not save. Please check your connection and try again.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -742,11 +773,24 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     if (_profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Business profile not loaded. Please check Settings.'),
+          content:
+              const Text('Business profile not loaded. Please check Settings.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
       return;
+    }
+
+    // Block sending a $0 invoice (quotes are exempt — they're estimates)
+    if ((_editableData['type']?.toString() ?? 'invoice') != 'quote') {
+      if (_calculateTotal() <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Add line items before sending — invoice total is \$0')),
+        );
+        return;
+      }
     }
 
     final revisionOf = _editableData['revision_of']?.toString();
@@ -782,9 +826,11 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               children: [
                 Center(
                   child: Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
-                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                      color:
+                          colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -807,7 +853,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -825,7 +871,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(48),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -871,10 +917,13 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           final jobId = _editableData['id']?.toString() ?? '';
           final userId = _supabase.auth.currentUser?.id ?? '';
           if (materials.isNotEmpty && jobId.isNotEmpty && userId.isNotEmpty) {
-            final mcRepo =
-                ProviderScope.containerOf(context).read(materialCostRepositoryProvider);
+            final mcRepo = ProviderScope.containerOf(context)
+                .read(materialCostRepositoryProvider);
             await mcRepo.recognizeMaterialCosts(
-              userId, jobId, materials, DateTime.now(),
+              userId,
+              jobId,
+              materials,
+              DateTime.now(),
             );
 
             // Auto-link pending expense from the receipt "Both" flow.
@@ -890,8 +939,9 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               }
             }
           }
-        } catch (_) {
+        } catch (e) {
           // Non-fatal — cost recognition failure must not block send.
+          debugPrint('Material cost recognition failed (non-fatal): $e');
         }
       }
 
@@ -952,11 +1002,11 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       // Supersede the original's recognized material costs so they are
       // not counted in analytics.  The new revision will create fresh costs.
       try {
-        final mcRepo =
-            ProviderScope.containerOf(context).read(materialCostRepositoryProvider);
+        final mcRepo = ProviderScope.containerOf(context)
+            .read(materialCostRepositoryProvider);
         await mcRepo.supersedeCostsForJob(originalJobId);
-      } catch (_) {
-        // Non-fatal.
+      } catch (e) {
+        debugPrint('Material cost supersession failed (non-fatal): $e');
       }
     } catch (e) {
       debugPrint('Failed to carry forward payments: $e');
@@ -967,11 +1017,12 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   /// Preview PDF — opens PdfPreviewScreen with the current live worksheet state.
   /// Does NOT save the job. Does NOT change status. The user returns to the
   /// same editing session via the back button.
-  void _previewPdf() {
+  void _previewPdf() async {
     if (_profile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Business profile not loaded. Please check Settings.'),
+          content:
+              const Text('Business profile not loaded. Please check Settings.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -979,6 +1030,33 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     }
     // Build PDF data from current in-memory worksheet state, not from Supabase.
     final liveData = _buildCurrentPdfData();
+
+    // If Stripe payment is toggled on, ensure the PDF shows the payment section.
+    // Re-use an existing checkout URL if available; otherwise use a preview
+    // placeholder so the QR/link section renders in the preview.
+    final isQuote = (_editableData['type']?.toString() ?? 'invoice') == 'quote';
+    if (!isQuote && _includeStripePayment) {
+      final existingUrl =
+          (liveData['payment_checkout_url'] ?? liveData['securePaymentUrl'] ?? '')
+              .toString()
+              .trim();
+      if (existingUrl.isEmpty) {
+        liveData['securePaymentUrl'] = 'https://checkout.stripe.com/preview';
+      }
+      liveData['securePaymentProvider'] =
+          liveData['payment_provider']?.toString().trim().isNotEmpty == true
+              ? liveData['payment_provider']
+              : 'stripe';
+      final template = await TemplateService.loadTemplate();
+      liveData['preferredPaymentMethods'] =
+          InvoiceTemplate.normalizePaymentMethods([
+        ...template.preferredPaymentMethods,
+        InvoiceTemplate.paymentMethodStripe,
+      ]);
+      liveData['paymentMethodDetails'] = template.paymentMethodDetails;
+    }
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1244,7 +1322,11 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final materials = (_editableData['materials'] as List?) ?? [];
     for (int i = 0; i < materials.length; i++) {
       final m = materials[i];
-      if (m['fromReceipt'] == true && m['originalCost'] != null) {
+      // Snapshot the original cost the first time markup is applied
+      if (m['originalCost'] == null && m['cost'] != null) {
+        m['originalCost'] = (m['cost'] as num).toDouble();
+      }
+      if (m['originalCost'] != null) {
         final original = (m['originalCost'] as num).toDouble();
         final markedUp = _markupPercent > 0
             ? original * (1 + _markupPercent / 100)
@@ -1380,9 +1462,285 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     );
   }
 
+  /// Pick from existing logged expenses to add as materials
+  Future<void> _pickFromExpenses() async {
+    final container = ProviderScope.containerOf(context);
+    final expenseState = container.read(expenseListProvider);
+    final expenses = expenseState.expenses;
+
+    if (expenses.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No logged expenses found')),
+        );
+      }
+      return;
+    }
+
+    // Filter to expenses that have an amount
+    final alreadyLinkedIds = (_editableData['materials'] as List)
+        .where((m) => m['expenseId'] != null)
+        .map((m) => m['expenseId'].toString())
+        .toSet();
+
+    final available = expenses.where((e) {
+      return e.amount > 0 && !alreadyLinkedIds.contains(e.id);
+    }).toList();
+
+    if (available.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No available expenses to import')),
+        );
+      }
+      return;
+    }
+
+    final cs = Theme.of(context).colorScheme;
+    final symbol = _profile?.currencySymbol ?? '\$';
+    final f = NumberFormat.currency(symbol: symbol);
+    final selected = <Expense>{};
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              maxChildSize: 0.9,
+              minChildSize: 0.4,
+              expand: false,
+              builder: (_, scrollCtrl) {
+                return Column(
+                  children: [
+                    // Handle bar
+                    Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: cs.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                      child: Row(
+                        children: [
+                          Icon(Icons.receipt_long, color: cs.primary),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Import from Expenses',
+                                    style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700)),
+                                Text(
+                                  'Select expenses to add as materials',
+                                  style: TextStyle(
+                                      fontSize: 12, color: cs.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (selected.isNotEmpty)
+                            FilledButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text('Add ${selected.length}'),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const Divider(),
+                    // Expense list
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollCtrl,
+                        itemCount: available.length,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        itemBuilder: (_, i) {
+                          final expense = available[i];
+                          final isSelected = selected.contains(expense);
+                          final cat = expense.category;
+                          final dateStr =
+                              DateFormat('MMM d').format(expense.expenseDate);
+                          final hasReceipt = expense.hasReceipt;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? cs.primaryContainer.withValues(alpha: 0.3)
+                                  : cs.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? cs.primary.withValues(alpha: 0.5)
+                                    : cs.outlineVariant.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 2),
+                              leading: CircleAvatar(
+                                radius: 18,
+                                backgroundColor: isSelected
+                                    ? cs.primary.withValues(alpha: 0.15)
+                                    : cs.surfaceContainerHigh,
+                                child: isSelected
+                                    ? Icon(Icons.check,
+                                        size: 18, color: cs.primary)
+                                    : Icon(_getCategoryIcon(cat),
+                                        size: 18, color: cs.onSurfaceVariant),
+                              ),
+                              title: Text(
+                                expense.description,
+                                style: const TextStyle(
+                                    fontSize: 14, fontWeight: FontWeight.w600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                [
+                                  if (expense.vendor != null &&
+                                      expense.vendor!.isNotEmpty)
+                                    expense.vendor!,
+                                  dateStr,
+                                  cat.displayName,
+                                  if (hasReceipt) 'Has receipt',
+                                ].join(' · '),
+                                style: TextStyle(
+                                    fontSize: 11, color: cs.onSurfaceVariant),
+                              ),
+                              trailing: Text(
+                                f.format(expense.amount),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isSelected ? cs.primary : cs.onSurface,
+                                ),
+                              ),
+                              onTap: () {
+                                setSheetState(() {
+                                  if (isSelected) {
+                                    selected.remove(expense);
+                                  } else {
+                                    selected.add(expense);
+                                  }
+                                });
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    // Running total
+                    if (selected.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerLow,
+                          border:
+                              Border(top: BorderSide(color: cs.outlineVariant)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '${selected.length} expense${selected.length > 1 ? 's' : ''} selected',
+                              style: TextStyle(
+                                  fontSize: 13, color: cs.onSurfaceVariant),
+                            ),
+                            Text(
+                              f.format(selected.fold(
+                                  0.0, (sum, e) => sum + e.amount)),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    ).then((confirmed) {
+      if (confirmed == true && selected.isNotEmpty) {
+        setState(() {
+          for (final expense in selected) {
+            final cost = expense.amount;
+            final markedUpCost =
+                _markupPercent > 0 ? cost * (1 + _markupPercent / 100) : cost;
+            (_editableData['materials'] as List).add({
+              'item': expense.description,
+              'quantity': 1,
+              'unitPrice': double.parse(markedUpCost.toStringAsFixed(2)),
+              'cost': double.parse(markedUpCost.toStringAsFixed(2)),
+              'originalCost': cost,
+              'fromReceipt': expense.hasReceipt,
+              'expenseId': expense.id,
+            });
+          }
+          _isDirty = true;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  '${selected.length} expense${selected.length > 1 ? 's' : ''} added as materials${_markupPercent > 0 ? ' with ${_markupPercent.toStringAsFixed(0)}% markup' : ''}'),
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  IconData _getCategoryIcon(ExpenseCategory cat) {
+    switch (cat) {
+      case ExpenseCategory.materials:
+        return Icons.handyman;
+      case ExpenseCategory.labor:
+        return Icons.engineering;
+      case ExpenseCategory.fuel:
+        return Icons.local_gas_station;
+      case ExpenseCategory.tools:
+        return Icons.build;
+      case ExpenseCategory.supplies:
+        return Icons.inventory_2;
+      case ExpenseCategory.insurance:
+        return Icons.shield;
+      case ExpenseCategory.utilities:
+        return Icons.bolt;
+      case ExpenseCategory.marketing:
+        return Icons.campaign;
+      case ExpenseCategory.fees:
+        return Icons.account_balance;
+      case ExpenseCategory.meals:
+        return Icons.restaurant;
+      case ExpenseCategory.other:
+        return Icons.more_horiz;
+    }
+  }
+
   void _addMaterialItem() {
     final nameCtrl = TextEditingController();
-    final costCtrl = TextEditingController();
+    final qtyCtrl = TextEditingController(text: '1');
+    final unitPriceCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -1399,13 +1757,34 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 10),
-            TextField(
-              key: const ValueKey('material_cost_field'),
-              controller: costCtrl,
-              decoration:
-                  const InputDecoration(labelText: 'Cost', prefixText: '\$'),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+            Row(
+              children: [
+                SizedBox(
+                  width: 70,
+                  child: TextField(
+                    key: const ValueKey('material_qty_field'),
+                    controller: qtyCtrl,
+                    decoration: const InputDecoration(labelText: 'Qty'),
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text('×',
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextField(
+                    key: const ValueKey('material_cost_field'),
+                    controller: unitPriceCtrl,
+                    decoration: const InputDecoration(
+                        labelText: 'Unit Price', prefixText: '\$'),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -1416,11 +1795,15 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           ElevatedButton(
             onPressed: () {
               if (nameCtrl.text.isNotEmpty) {
+                final qty = int.tryParse(qtyCtrl.text) ?? 1;
+                final unitPrice = double.tryParse(unitPriceCtrl.text) ?? 0.0;
                 setState(() {
                   (_editableData['materials'] as List).add({
                     'id': const Uuid().v4(),
                     'item': nameCtrl.text,
-                    'cost': double.tryParse(costCtrl.text) ?? 0.0,
+                    'quantity': qty < 1 ? 1 : qty,
+                    'unitPrice': unitPrice,
+                    'cost': (qty < 1 ? 1 : qty) * unitPrice,
                   });
                   _isDirty = true;
                 });
@@ -1440,8 +1823,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final format = NumberFormat.currency(symbol: symbol);
     final total = _calculateTotal();
     final colorScheme = Theme.of(context).colorScheme;
-    final docType =
-        _editableData['type']?.toString().toUpperCase() ?? 'JOB';
+    final docType = _editableData['type']?.toString().toUpperCase() ?? 'JOB';
 
     return PopScope(
       canPop: false,
@@ -1451,294 +1833,426 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
         if (shouldPop && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 150,
-            centerTitle: true,
-            title: Text('$docType WORKSHEET'),
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                color: colorScheme.primary,
-                alignment: Alignment.bottomCenter,
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      child: Text(format.format(total),
-                          maxLines: 1,
-                          style: TextStyle(
-                              color: colorScheme.onPrimary,
-                              fontSize: 36,
-                              fontWeight: FontWeight.w900)),
-                    ),
-                    const SizedBox(height: 2),
-                    Text('ESTIMATED TOTAL (INC. TAX)',
-                        style: TextStyle(
-                            color:
-                                colorScheme.onPrimary.withValues(alpha: 0.6),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold)),
-                  ],
+        body: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              pinned: true,
+              expandedHeight: 114,
+              centerTitle: true,
+              foregroundColor: colorScheme.onPrimary,
+              backgroundColor: colorScheme.primary,
+              title: Text(
+                docType == 'QUOTE' ? 'Quote' : 'Invoice',
+                style: TextStyle(
+                  color: colorScheme.onPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
                 ),
               ),
-            ),
-          ),
-          // Revision context banner — shown when editing a clone of a sent invoice
-          if (_editableData['revision_of'] != null)
-            SliverToBoxAdapter(
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: colorScheme.primary.withValues(alpha: 0.2),
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        HSLColor.fromColor(colorScheme.primary)
+                            .withLightness(
+                                (HSLColor.fromColor(colorScheme.primary)
+                                            .lightness -
+                                        0.05)
+                                    .clamp(0.0, 1.0))
+                            .toColor(),
+                        colorScheme.primary,
+                      ],
+                    ),
+                  ),
+                  alignment: Alignment.bottomCenter,
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(format.format(total),
+                              maxLines: 1,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.5,
+                                  height: 1.1)),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('Estimated total incl. tax',
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              letterSpacing: 0.2)),
+                    ],
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.edit_note_rounded,
-                        size: 18, color: colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Editing revision draft \u2014 original invoice preserved',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                            ),
-                      ),
+              ),
+            ),
+            // Revision context banner — shown when editing a clone of a sent invoice
+            if (_editableData['revision_of'] != null)
+              SliverToBoxAdapter(
+                child: Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.2),
                     ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit_note_rounded,
+                          size: 18, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Editing revision draft \u2014 original invoice preserved',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.primary,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTypeToggle(),
+                    const SizedBox(height: 10),
+                    _buildVoiceRefineButton(),
+                    const SizedBox(height: 12),
+                    _clientSection(),
+                    const SizedBox(height: 10),
+                    _documentSection(format),
+                    const SizedBox(height: 10),
+                    _materialsSection(format),
+                    const SizedBox(height: 14),
+                    _buildPaymentSection(),
+                    const SizedBox(height: 20),
+                    _actions(),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTypeToggle(),
-                  const SizedBox(height: 24),
-                  _primaryForm(format),
-                  const SizedBox(height: 30),
-                  _materialsSection(format),
-                  const SizedBox(height: 24),
-                  _buildPaymentSection(),
-                  const SizedBox(height: 40),
-                  _actions(),
-                  const SizedBox(height: 40),
-                ],
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
   Widget _buildTypeToggle() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('DOCUMENT TYPE',
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 8),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(
-                value: 'invoice',
-                label: Text('Invoice'),
-                icon: Icon(Icons.receipt_long)),
-            ButtonSegment(
-                value: 'quote',
-                label: Text('Quote'),
-                icon: Icon(Icons.request_quote)),
-          ],
-          selected: {_editableData['type'] as String? ?? 'invoice'},
-          onSelectionChanged: (Set<String> newSelection) {
-            setState(() {
-              _editableData['type'] = newSelection.first;
-              _isDirty = true;
-            });
-          },
+    final cs = Theme.of(context).colorScheme;
+    final selected = _editableData['type'] as String? ?? 'invoice';
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.45),
+          width: 0.8,
         ),
-      ],
+      ),
+      child: Row(
+        children: [
+          _toggleSegment('invoice', 'Invoice', selected, cs),
+          _toggleSegment('quote', 'Quote', selected, cs),
+        ],
+      ),
     );
   }
 
-  Widget _primaryForm(NumberFormat f) {
-    final type = _editableData['laborType'] ?? 'profile';
+  Widget _toggleSegment(
+      String value, String label, String selected, ColorScheme cs) {
+    final isSelected = value == selected;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          if (!isSelected) {
+            setState(() {
+              _editableData['type'] = value;
+              _isDirty = true;
+            });
+          }
+        },
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          margin: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: isSelected ? cs.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+              letterSpacing: 0.1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Compact field decoration (denser padding for card-grouped fields) ──
+  static const _denseFieldPadding =
+      EdgeInsets.symmetric(horizontal: 14, vertical: 10);
+
+  InputDecoration _denseDecoration(String label,
+      {Widget? suffixIcon, String? suffixText}) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      contentPadding: _denseFieldPadding,
+      suffixIcon: suffixIcon,
+      suffixText: suffixText,
+    );
+  }
+
+  /// Section card wrapper — groups related fields with an optional label.
+  Widget _sectionCard(
+      {String? label, required Widget child, EdgeInsets? padding}) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.38),
+          width: 0.8,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: cs.shadow.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (label != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+              child: Text(label,
+                  style: AppTextStyles.metadata(Theme.of(context).textTheme,
+                          Theme.of(context).colorScheme)
+                      .copyWith(
+                          fontWeight: FontWeight.w700, letterSpacing: 1.05)),
+            ),
+          Padding(
+            padding: padding ??
+                EdgeInsets.fromLTRB(14, label != null ? 10 : 14, 14, 14),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _toolActionChip({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required ColorScheme colorScheme,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.2),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.12),
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _clientSection() {
     final linkedCustomerId =
         (_editableData['customer_id'] ?? _editableData['customerId'])
             ?.toString()
             .trim();
     final isLinked = linkedCustomerId != null && linkedCustomerId.isNotEmpty;
 
-    return Column(
-      children: [
-        // Client name with picker
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('client_name_field'),
-                controller: _clientCtrl,
-                onChanged: (_) => _autoMatchCustomer(),
-                decoration: InputDecoration(
-                  labelText: 'Client Name',
-                  filled: true,
-                  border: const OutlineInputBorder(borderSide: BorderSide.none),
-                  suffixIcon: isLinked
-                      ? Tooltip(
-                          message: 'Linked to client ledger',
-                          child: Icon(Icons.link,
-                              color: AppColors.paid(context), size: 20),
-                        )
-                      : null,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: IconButton.filled(
-                onPressed: _customers.isEmpty ? null : _showCustomerPicker,
-                icon: const Icon(Icons.person_search, size: 22),
-                style: IconButton.styleFrom(
-                  backgroundColor: Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withValues(alpha: 0.3),
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                ),
-                tooltip: 'Select existing client',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          key: const ValueKey('client_address_field'),
-          controller: _clientAddressCtrl,
-          maxLines: 2,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Client Address (Optional)',
-            filled: true,
-            border: OutlineInputBorder(borderSide: BorderSide.none),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          key: const ValueKey('invoice_number_field'),
-          controller: _invoiceNumberCtrl,
-          textCapitalization: TextCapitalization.characters,
-          inputFormatters: [
-            FilteringTextInputFormatter.allow(
-              RegExp(r'[A-Za-z0-9/_-]'),
-            ),
-          ],
-          onChanged: (value) {
-            _invoiceNumberEditedByUser = true;
-            _editableData['invoiceNumber'] = value.trim();
-            _editableData['invoice_number'] = value.trim();
-          },
-          decoration: InputDecoration(
-            labelText: (_editableData['type']?.toString() == 'quote')
-                ? 'Quote Number'
-                : 'Invoice Number',
-            filled: true,
-            border: const OutlineInputBorder(
-              borderSide: BorderSide.none,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final phoneField = TextField(
-              key: const ValueKey('client_phone_field'),
-              controller: _clientPhoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone (Optional)',
-                filled: true,
-                border: OutlineInputBorder(borderSide: BorderSide.none),
-              ),
-            );
-            final emailField = TextField(
-              key: const ValueKey('client_email_field'),
-              controller: _clientEmailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email (Optional)',
-                filled: true,
-                border: OutlineInputBorder(borderSide: BorderSide.none),
-              ),
-            );
-            // Stack vertically on narrow screens (< 360px) to avoid truncation
-            if (constraints.maxWidth < 360) {
-              return Column(
-                children: [
-                  phoneField,
-                  const SizedBox(height: 12),
-                  emailField,
-                ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(child: phoneField),
-                const SizedBox(width: 12),
-                Expanded(child: emailField),
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: 16),
-        TextField(
-            key: const ValueKey('job_summary_field'),
-            controller: _descCtrl,
-            maxLines: 3,
-            decoration: const InputDecoration(
-                labelText: 'Job Summary',
-                filled: true,
-                border: OutlineInputBorder(borderSide: BorderSide.none))),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
+    return _sectionCard(
+      label: 'CLIENT',
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
                 child: TextField(
-                    key: const ValueKey('labor_hours_field'),
-                    enabled: type != 'flat',
-                    controller: _laborHoursCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    onChanged: (_) => setState(() {}),
-                    decoration: const InputDecoration(
-                        labelText: 'Hours',
-                        suffixText: 'hrs',
-                        filled: true,
-                        border:
-                            OutlineInputBorder(borderSide: BorderSide.none)))),
-            const SizedBox(width: 15),
-            _laborBadge(f),
-          ],
-        ),
-      ],
+                  key: const ValueKey('client_name_field'),
+                  controller: _clientCtrl,
+                  onChanged: (_) => _autoMatchCustomer(),
+                  decoration: _denseDecoration('Client Name',
+                      suffixIcon: isLinked
+                          ? Tooltip(
+                              message: 'Linked to client ledger',
+                              child: Icon(Icons.link,
+                                  color: AppColors.paid(context), size: 18),
+                            )
+                          : null),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: IconButton.filled(
+                  onPressed: _customers.isEmpty ? null : _showCustomerPicker,
+                  icon: const Icon(Icons.person_search, size: 20),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer
+                        .withValues(alpha: 0.3),
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    minimumSize: const Size(44, 44),
+                  ),
+                  tooltip: 'Select existing client',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            key: const ValueKey('client_address_field'),
+            controller: _clientAddressCtrl,
+            minLines: 1,
+            maxLines: 2,
+            textCapitalization: TextCapitalization.words,
+            decoration: _denseDecoration('Address (Optional)'),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('client_phone_field'),
+                  controller: _clientPhoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: _denseDecoration('Phone'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('client_email_field'),
+                  controller: _clientEmailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _denseDecoration('Email'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _documentSection(NumberFormat f) {
+    final type = _editableData['laborType'] ?? 'profile';
+
+    return _sectionCard(
+      label: 'DETAILS',
+      child: Column(
+        children: [
+          TextField(
+            key: const ValueKey('invoice_number_field'),
+            controller: _invoiceNumberCtrl,
+            textCapitalization: TextCapitalization.characters,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(
+                RegExp(r'[A-Za-z0-9/_-]'),
+              ),
+            ],
+            onChanged: (value) {
+              _invoiceNumberEditedByUser = true;
+              _editableData['invoiceNumber'] = value.trim();
+              _editableData['invoice_number'] = value.trim();
+            },
+            decoration: _denseDecoration(
+              (_editableData['type']?.toString() == 'quote')
+                  ? 'Quote Number'
+                  : 'Invoice Number',
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+              key: const ValueKey('job_summary_field'),
+              controller: _descCtrl,
+              minLines: 2,
+              maxLines: 4,
+              decoration: _denseDecoration('Job Summary')),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                  child: TextField(
+                      key: const ValueKey('labor_hours_field'),
+                      enabled: type != 'flat',
+                      controller: _laborHoursCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => setState(() {}),
+                      decoration:
+                          _denseDecoration('Hours', suffixText: 'hrs'))),
+              const SizedBox(width: 10),
+              _laborBadge(f),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1747,13 +2261,18 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final type = _editableData['laborType'] ?? 'profile';
     if (type == 'flat') {
       return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12)),
+              color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.12),
+              )),
           child: Text('Flat Fee',
               style: TextStyle(
-                  color: colorScheme.primary, fontWeight: FontWeight.bold)));
+                  color: colorScheme.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13)));
     }
     final rate = type == 'hourly'
         ? (double.tryParse(_editableData['laborRate']?.toString() ?? '85') ??
@@ -1762,25 +2281,32 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     return GestureDetector(
       onTap: () => _showEditHourlyRateDialog(rate),
       child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12)),
+              color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: colorScheme.primary.withValues(alpha: 0.12),
+              )),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('× ${f.format(rate)}',
                   style: TextStyle(
-                      color: colorScheme.primary, fontWeight: FontWeight.bold)),
-              const SizedBox(width: 4),
-              Icon(Icons.edit, size: 14, color: colorScheme.primary.withValues(alpha: 0.6)),
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13)),
+              const SizedBox(width: 3),
+              Icon(Icons.edit,
+                  size: 12, color: colorScheme.primary.withValues(alpha: 0.45)),
             ],
           )),
     );
   }
 
   void _showEditHourlyRateDialog(double currentRate) {
-    final rateCtrl = TextEditingController(text: currentRate.toStringAsFixed(2));
+    final rateCtrl =
+        TextEditingController(text: currentRate.toStringAsFixed(2));
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1818,199 +2344,322 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   }
 
   Widget _materialsSection(NumberFormat f) {
+    final cs = Theme.of(context).colorScheme;
     final materials = (_editableData['materials'] as List?) ?? [];
-    final hasReceiptItems =
-        materials.any((m) => m is Map && m['fromReceipt'] == true);
+    final materialsTotal = materials.fold<double>(
+      0,
+      (sum, item) =>
+          sum + (double.tryParse(item['cost']?.toString() ?? '0') ?? 0.0),
+    );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Flexible(
-              child: Text('MATERIALS & PARTS',
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton.icon(
-                  onPressed: _scanReceiptForMaterials,
-                  icon: Icon(Icons.camera_alt,
-                      size: 16, color: Theme.of(context).colorScheme.primary),
-                  label: Text('Scan',
-                      style: TextStyle(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontSize: 13)),
-                ),
-                TextButton.icon(
-                    onPressed: _addMaterialItem,
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('Add')),
-              ],
-            ),
-          ],
-        ),
-
-        // Markup section
-        if (hasReceiptItems || _markupPercent > 0) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .tertiaryContainer
-                  .withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .tertiary
-                      .withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.trending_up,
-                    color: Theme.of(context).colorScheme.tertiary, size: 20),
-                const SizedBox(width: 8),
-                const Text('Markup: ',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                SizedBox(
-                  width: 60,
-                  child: TextField(
-                    controller: _markupCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 16),
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                      border: OutlineInputBorder(),
-                    ),
-                    onChanged: (v) {
-                      setState(() {
-                        _markupPercent = double.tryParse(v) ?? 0.0;
-                        _applyMarkupToReceiptItems();
-                      });
-                    },
+    return _sectionCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row: title + summary badges inline
+          Row(
+            children: [
+              Text('MATERIALS & PARTS',
+                  style: AppTextStyles.metadata(Theme.of(context).textTheme, cs)
+                      .copyWith(fontWeight: FontWeight.w700, letterSpacing: 1.05)),
+              const Spacer(),
+              if (materials.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-                const Text(' %',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                const Spacer(),
-                if (_markupPercent > 0)
-                  Flexible(
-                    child: Text(
-                      'Applied to receipt items',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.tertiary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                  child: Text(
+                    '${materials.length} ${materials.length == 1 ? 'item' : 'items'}',
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    f.format(materialsTotal),
+                    style: TextStyle(
+                      color: cs.primary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
-        ],
 
-        const SizedBox(height: 8),
-        if (materials.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12)),
-            child: Column(
-              children: [
-                Text('No materials added yet',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 13)),
-                const SizedBox(height: 8),
-                Text('Scan a receipt or add items manually',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: 11)),
-              ],
-            ),
-          )
-        else
-          ...materials.asMap().entries.map((e) {
-            final index = e.key;
-            final item = e.value;
-            final isFromReceipt = item['fromReceipt'] == true;
-            final originalCost = item['originalCost'] as num?;
-            final currentCost = (item['cost'] as num?)?.toDouble() ?? 0.0;
-            final hasMarkup =
-                isFromReceipt && originalCost != null && _markupPercent > 0;
+          const SizedBox(height: 14),
 
-            return Card(
-              elevation: 0,
-              margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-                side: BorderSide(
-                  color: isFromReceipt
-                      ? Theme.of(context).colorScheme.outlineVariant
-                      : Theme.of(context)
-                          .colorScheme
-                          .outlineVariant
-                          .withValues(alpha: 0.3),
+          // Material items list
+          if (materials.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLow.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(alpha: 0.2),
                 ),
               ),
-              color: isFromReceipt
-                  ? Theme.of(context)
-                      .colorScheme
-                      .primaryContainer
-                      .withValues(alpha: 0.3)
-                  : null,
-              child: ListTile(
-                leading: isFromReceipt
-                    ? Icon(Icons.receipt,
-                        size: 20, color: Theme.of(context).colorScheme.primary)
-                    : null,
-                title: Text(item['item'] ?? 'Unknown'),
-                subtitle: hasMarkup
-                    ? Text(
-                        '\$${originalCost.toStringAsFixed(2)} + ${_markupPercent.toStringAsFixed(0)}%',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.tertiary,
-                        ),
-                      )
-                    : null,
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: 28,
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'No materials added yet',
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Add materials using the options below.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            ...materials.asMap().entries.map((e) {
+              final index = e.key;
+              final item = e.value;
+              final isFromReceipt = item['fromReceipt'] == true;
+              final originalCost = item['originalCost'] as num?;
+              final currentCost = (item['cost'] as num?)?.toDouble() ?? 0.0;
+              final hasMarkup =
+                  originalCost != null && _markupPercent > 0;
+              final qty = (item['quantity'] as num?)?.toInt() ?? 1;
+              final unitPrice = (item['unitPrice'] as num?)?.toDouble();
+
+              return Container(
+                margin: EdgeInsets.only(bottom: index < materials.length - 1 ? 6 : 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isFromReceipt
+                      ? cs.primaryContainer.withValues(alpha: 0.15)
+                      : cs.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: cs.outlineVariant.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Row(
                   children: [
+                    if (isFromReceipt) ...[
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: cs.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(Icons.receipt_outlined, size: 14, color: cs.primary),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item['item'] ?? 'Unknown',
+                              style: const TextStyle(
+                                  fontSize: 13.5, fontWeight: FontWeight.w600),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 2),
+                          if (qty > 1 && unitPrice != null)
+                            Text(
+                              '$qty × ${f.format(unitPrice)}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                              ),
+                            )
+                          else if (hasMarkup)
+                            Text(
+                              '\$${originalCost.toStringAsFixed(2)} + ${_markupPercent.toStringAsFixed(0)}% markup',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.tertiary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )
+                          else
+                            Text(
+                              qty > 1 ? 'Qty: $qty' : 'Qty: 1',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(f.format(currentCost),
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline,
-                          color: Colors.redAccent, size: 20),
-                      onPressed: () =>
-                          setState(() { materials.removeAt(index); _isDirty = true; }),
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            color: cs.onSurface)),
+                    const SizedBox(width: 4),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => setState(() {
+                          materials.removeAt(index);
+                          _isDirty = true;
+                        }),
+                        borderRadius: BorderRadius.circular(999),
+                        child: Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: cs.onSurfaceVariant.withValues(alpha: 0.45),
+                            size: 16,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
+              );
+            }),
+
+          // Markup section – always visible
+          ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: cs.tertiaryContainer.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: cs.tertiary.withValues(alpha: 0.18)),
               ),
-            );
-          }),
-      ],
+              child: Row(
+                children: [
+                  Icon(Icons.trending_up_rounded, color: cs.tertiary, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Markup',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          color: cs.onSurface)),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 52,
+                    child: TextField(
+                      controller: _markupCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: cs.tertiary),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: cs.tertiary.withValues(alpha: 0.3)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: cs.tertiary.withValues(alpha: 0.3)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: cs.tertiary),
+                        ),
+                      ),
+                      onChanged: (v) {
+                        setState(() {
+                          _markupPercent = double.tryParse(v) ?? 0.0;
+                          _applyMarkupToReceiptItems();
+                        });
+                      },
+                    ),
+                  ),
+                  Text(' %',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: cs.tertiary)),
+                  const Spacer(),
+                  if (_markupPercent > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: cs.tertiary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        'Active',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: cs.tertiary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+
+          // Action buttons
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _toolActionChip(
+                icon: Icons.camera_alt_rounded,
+                label: 'Scan',
+                onTap: _scanReceiptForMaterials,
+                colorScheme: cs,
+              ),
+              const SizedBox(width: 8),
+              _toolActionChip(
+                icon: Icons.receipt_long_rounded,
+                label: 'Receipts',
+                onTap: _pickFromExpenses,
+                colorScheme: cs,
+              ),
+              const SizedBox(width: 8),
+              _toolActionChip(
+                icon: Icons.add_rounded,
+                label: 'Add item',
+                onTap: _addMaterialItem,
+                colorScheme: cs,
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -2021,16 +2670,17 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       decoration: BoxDecoration(
         color: _includeStripePayment
-            ? colorScheme.primaryContainer.withValues(alpha: 0.4)
-            : colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+            ? colorScheme.primaryContainer.withValues(alpha: 0.3)
+            : colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: _includeStripePayment
               ? colorScheme.primary.withValues(alpha: 0.4)
-              : colorScheme.outlineVariant,
+              : colorScheme.outlineVariant.withValues(alpha: 0.45),
+          width: 0.5,
         ),
       ),
       child: Column(
@@ -2044,7 +2694,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   : colorScheme.onSurfaceVariant,
             ),
             title: const Text('Include Stripe Payment Link',
-                style: TextStyle(fontWeight: FontWeight.w600)),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             subtitle: Text(
               _includeStripePayment
                   ? 'A secure payment QR code and link will be added to the PDF'
@@ -2053,7 +2703,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
             ),
             value: _includeStripePayment,
-            activeColor: colorScheme.primary,
+            activeThumbColor: colorScheme.primary,
+            activeTrackColor: colorScheme.primary.withValues(alpha: 0.32),
             onChanged: (v) => setState(() {
               _includeStripePayment = v;
               _stripeOverrideActive = true;
@@ -2085,6 +2736,56 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     );
   }
 
+  Widget _buildVoiceRefineButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final busy = _isSaving || _isGeneratingSecurePdf;
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: busy ? null : _voiceRefine,
+          borderRadius: BorderRadius.circular(999),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              color: colorScheme.tertiaryContainer.withValues(
+                alpha: busy ? 0.08 : 0.25,
+              ),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: colorScheme.tertiary.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.mic_rounded,
+                  size: 16,
+                  color: busy
+                      ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+                      : colorScheme.tertiary,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Edit with voice',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                    color: busy
+                        ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+                        : colorScheme.tertiary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _actions() {
     final colorScheme = Theme.of(context).colorScheme;
     final isQuote = (_editableData['type']?.toString() ?? 'invoice') == 'quote';
@@ -2093,86 +2794,65 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 
     return Column(
       children: [
-        // ── Editing helper ───────────────────────────────────────────────
-        // Compact voice button — editing tool, not an outcome action.
-        TextButton.icon(
-          onPressed: busy ? null : _voiceRefine,
-          icon: Icon(Icons.mic_rounded, size: 18,
-              color: busy ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
-                         : colorScheme.tertiary),
-          label: Text(
-            'Continue with voice',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 14,
-              color: busy ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
-                         : colorScheme.tertiary,
-            ),
-          ),
-          style: TextButton.styleFrom(
-            minimumSize: const Size.fromHeight(40),
-          ),
-        ),
-
-        const SizedBox(height: 20),
-
-        // ── Outcome actions ──────────────────────────────────────────────
-
         // 1) PRIMARY: Send Invoice / Send Quote
         FilledButton.icon(
           onPressed: busy ? null : _sendDocument,
           icon: _isSaving
               ? SizedBox(
-                  width: 18, height: 18,
+                  width: 18,
+                  height: 18,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2, color: colorScheme.onPrimary,
+                    strokeWidth: 2,
+                    color: colorScheme.onPrimary,
                   ),
                 )
-              : const Icon(Icons.send_rounded, size: 20),
+              : const Icon(Icons.send_rounded, size: 18),
           label: Text(
             _isSaving ? 'Sending…' : 'Send $docLabel',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           ),
           style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(56),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            minimumSize: const Size.fromHeight(52),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
         // 2) SECONDARY: Preview Invoice PDF / Preview Quote PDF
         OutlinedButton.icon(
           onPressed: (_profile == null || busy) ? null : _previewPdf,
-          icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+          icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
           label: Text(
             'Preview $docLabel PDF',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           ),
           style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(48),
+            minimumSize: const Size.fromHeight(46),
             foregroundColor: colorScheme.primary,
-            side: BorderSide(color: colorScheme.primary),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+            side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.5)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
         // 3) TERTIARY: Save Draft
         TextButton(
           onPressed: busy ? null : _saveJob,
           style: TextButton.styleFrom(
-            minimumSize: const Size.fromHeight(40),
+            minimumSize: const Size.fromHeight(38),
           ),
           child: Text(
             'Save Draft',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: busy ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
-                         : colorScheme.onSurfaceVariant,
+              fontSize: 13,
+              color: busy
+                  ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+                  : colorScheme.onSurfaceVariant,
             ),
           ),
         ),
@@ -2186,14 +2866,18 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       final container = ProviderScope.containerOf(context);
       final notifier = container.read(voiceCaptureProvider.notifier);
 
-      // Show a bottom sheet with voice recording UI
-      final result = await showModalBottomSheet<VoiceCaptureResult>(
-        context: context,
-        isScrollControlled: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      // Show a full-screen voice recording overlay
+      final result = await Navigator.of(context).push<VoiceCaptureResult>(
+        PageRouteBuilder(
+          opaque: false,
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              _VoiceRefineSheet(notifier: notifier),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+          transitionDuration: const Duration(milliseconds: 200),
+          reverseTransitionDuration: const Duration(milliseconds: 150),
         ),
-        builder: (ctx) => _VoiceRefineSheet(notifier: notifier),
       );
 
       if (result == null || !mounted) return;
@@ -2208,28 +2892,105 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           _descCtrl.text = existing.isEmpty ? newDesc : '$existing\n$newDesc';
         }
 
-        // Merge materials
-        final newMaterials = (newData['materials'] as List?) ?? [];
-        for (final m in newMaterials) {
-          if (m is Map) {
-            (_editableData['materials'] as List).add(Map<String, dynamic>.from(m));
+        // ── Apply edits (update/remove existing materials) ──
+        final edits = (newData['edits'] as List?) ?? [];
+        final materialsList = _editableData['materials'] as List;
+        for (final edit in edits) {
+          if (edit is! Map) continue;
+          final action = edit['action']?.toString() ?? '';
+          final targetName =
+              (edit['item']?.toString() ?? '').toLowerCase().trim();
+          if (targetName.isEmpty) continue;
+
+          // Find matching material by name (case-insensitive)
+          final matchIdx = materialsList.indexWhere((m) =>
+              m is Map &&
+              (m['item']?.toString() ?? '').toLowerCase().trim() == targetName);
+
+          if (matchIdx < 0) continue; // No match found
+
+          if (action == 'remove') {
+            materialsList.removeAt(matchIdx);
+          } else if (action == 'update') {
+            final existing =
+                Map<String, dynamic>.from(materialsList[matchIdx] as Map);
+            if (edit['quantity'] != null) {
+              existing['quantity'] = (edit['quantity'] as num).toInt();
+            }
+            if (edit['unitPrice'] != null) {
+              existing['unitPrice'] = (edit['unitPrice'] as num).toDouble();
+            }
+            // Recalculate cost
+            final qty = (existing['quantity'] as num?)?.toInt() ?? 1;
+            final unitPrice =
+                (existing['unitPrice'] as num?)?.toDouble() ?? 0.0;
+            existing['cost'] = qty * unitPrice;
+            materialsList[matchIdx] = existing;
           }
         }
 
-        // Update labor hours if provided
+        // ── Add new materials ──
+        final newMaterials = (newData['materials'] as List?) ?? [];
+        for (final m in newMaterials) {
+          if (m is Map) {
+            final mat = Map<String, dynamic>.from(m);
+            // Ensure quantity and unitPrice are present
+            final qty = (mat['quantity'] as num?)?.toInt() ?? 1;
+            final unitPrice = (mat['unitPrice'] as num?)?.toDouble();
+            final cost = (mat['cost'] as num?)?.toDouble() ?? 0.0;
+            mat['quantity'] = qty < 1 ? 1 : qty;
+            mat['unitPrice'] = unitPrice ?? (qty > 0 ? cost / qty : cost);
+            mat['cost'] = cost;
+            materialsList.add(mat);
+          }
+        }
+
+        // ── Update labor hours ──
+        // If edits contain labor change, replace instead of accumulate
+        final hasEdits = edits.isNotEmpty;
         final newHours = newData['laborHours'] ?? newData['labor_hours'];
         if (newHours != null) {
-          final currentHours = double.tryParse(_laborHoursCtrl.text) ?? 0;
           final additionalHours = (newHours as num).toDouble();
-          if (additionalHours > 0) {
+          if (hasEdits && additionalHours > 0) {
+            // Edit mode: replace labor hours
+            _laborHoursCtrl.text = additionalHours.toString();
+          } else if (additionalHours > 0) {
+            // Add mode: accumulate labor hours
+            final currentHours = double.tryParse(_laborHoursCtrl.text) ?? 0;
             _laborHoursCtrl.text = (currentHours + additionalHours).toString();
           }
         }
 
-        // Update client name if empty
-        if (_clientCtrl.text.trim().isEmpty) {
-          final newClient = (newData['clientName'] ?? newData['client_name'] ?? '').toString().trim();
-          if (newClient.isNotEmpty) _clientCtrl.text = newClient;
+        // ── Update labor type & rate ──
+        final newLaborType = newData['laborType']?.toString();
+        if (newLaborType != null && newLaborType != 'profile') {
+          _editableData['laborType'] = newLaborType;
+          if (newLaborType == 'hourly' && newData['laborRate'] != null) {
+            _editableData['laborRate'] =
+                (newData['laborRate'] as num).toDouble();
+          } else if (newLaborType == 'flat' && newData['laborAmount'] != null) {
+            _editableData['laborAmount'] =
+                (newData['laborAmount'] as num).toDouble();
+          }
+        }
+
+        // ── Update document type ──
+        final newType = newData['type']?.toString();
+        if (newType != null &&
+            (newType == 'invoice' || newType == 'quote') &&
+            hasEdits) {
+          _editableData['type'] = newType;
+        }
+
+        // Update client name (replace if edits, otherwise only if empty)
+        final newClient =
+            (newData['clientName'] ?? newData['client_name'] ?? '')
+                .toString()
+                .trim();
+        if (newClient.isNotEmpty && newClient != 'Unknown') {
+          if (hasEdits || _clientCtrl.text.trim().isEmpty) {
+            _clientCtrl.text = newClient;
+          }
         }
       });
 
@@ -2263,62 +3024,151 @@ class _VoiceRefineSheet extends StatefulWidget {
 class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
   bool _isRecording = false;
   bool _isProcessing = false;
-  String _statusText = 'Tap the mic to add more details';
+  String _statusText = 'Starting...';
+
+  @override
+  void initState() {
+    super.initState();
+    // Defer recording start to after the first frame to avoid
+    // "modify provider while widget tree is building" error.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _startRecording();
+    });
+  }
+
+  Future<void> _startRecording() async {
+    try {
+      await widget.notifier.startRecording();
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _statusText = 'Listening... describe additional details';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _statusText = 'Could not start recording. Tap mic to retry.');
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Continue Talking',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.close_rounded, color: colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          _isProcessing
+              ? 'Processing...'
+              : _isRecording
+                  ? 'Listening...'
+                  : 'Voice Edit',
+          style: TextStyle(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
           ),
-          const SizedBox(height: 8),
-          Text(
-            _statusText,
-            style: TextStyle(color: colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 24),
-          GestureDetector(
-            onTap: _isProcessing ? null : _toggleRecording,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: _isRecording ? colorScheme.error : colorScheme.primary,
-                shape: BoxShape.circle,
-                boxShadow: _isRecording
-                    ? [BoxShadow(color: colorScheme.error.withValues(alpha: 0.4), blurRadius: 16, spreadRadius: 4)]
-                    : null,
-              ),
-              child: _isProcessing
-                  ? const Padding(
-                      padding: EdgeInsets.all(20),
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
-                    )
-                  : Icon(
-                      _isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: Colors.white,
-                      size: 36,
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Animated recording indicator
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                width: _isRecording ? 140 : 100,
+                height: _isRecording ? 140 : 100,
+                decoration: BoxDecoration(
+                  color: (_isRecording
+                          ? colorScheme.error
+                          : colorScheme.primary)
+                      .withValues(alpha: 0.08),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: GestureDetector(
+                    onTap: _isProcessing ? null : _toggleRecording,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 88,
+                      height: 88,
+                      decoration: BoxDecoration(
+                        color: _isRecording
+                            ? colorScheme.error
+                            : colorScheme.primary,
+                        shape: BoxShape.circle,
+                        boxShadow: _isRecording
+                            ? [
+                                BoxShadow(
+                                  color:
+                                      colorScheme.error.withValues(alpha: 0.35),
+                                  blurRadius: 24,
+                                  spreadRadius: 4,
+                                )
+                              ]
+                            : [
+                                BoxShadow(
+                                  color: colorScheme.primary
+                                      .withValues(alpha: 0.25),
+                                  blurRadius: 16,
+                                  spreadRadius: 2,
+                                )
+                              ],
+                      ),
+                      child: _isProcessing
+                          ? const Padding(
+                              padding: EdgeInsets.all(24),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 3),
+                            )
+                          : Icon(
+                              _isRecording
+                                  ? Icons.stop_rounded
+                                  : Icons.mic_rounded,
+                              color: Colors.white,
+                              size: 40,
+                            ),
                     ),
-            ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 28),
+              Text(
+                _statusText,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _isRecording
+                    ? 'Tap to stop'
+                    : _isProcessing
+                        ? ''
+                        : 'Tap mic to start',
+                style: TextStyle(
+                  color: _isRecording
+                      ? colorScheme.error
+                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          Text(
-            _isRecording ? 'Recording... Tap to stop' : _isProcessing ? 'Processing...' : 'Describe additional details',
-            style: TextStyle(
-              color: _isRecording ? colorScheme.error : colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }
@@ -2331,7 +3181,19 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
         _statusText = 'Processing your voice input...';
       });
       try {
-        final result = await widget.notifier.stopAndProcess();
+        final result = await widget.notifier
+            .stopAndProcess()
+            .timeout(const Duration(seconds: 45));
+        if (result == null) {
+          // Pipeline failed (error was swallowed by notifier)
+          if (mounted) {
+            setState(() {
+              _isProcessing = false;
+              _statusText = 'Could not process audio. Tap mic to try again.';
+            });
+          }
+          return;
+        }
         if (mounted) {
           Navigator.pop(context, result);
         }
@@ -2339,22 +3201,12 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
         if (mounted) {
           setState(() {
             _isProcessing = false;
-            _statusText = 'Failed. Tap to try again.';
+            _statusText = 'Timed out. Tap mic to try again.';
           });
         }
       }
     } else {
-      try {
-        await widget.notifier.startRecording();
-        setState(() {
-          _isRecording = true;
-          _statusText = 'Listening... describe additional details';
-        });
-      } catch (e) {
-        if (mounted) {
-          setState(() => _statusText = 'Could not start recording');
-        }
-      }
+      await _startRecording();
     }
   }
 }

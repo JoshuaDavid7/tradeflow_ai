@@ -241,7 +241,9 @@ class _ReceiptScannerScreenState extends ConsumerState<ReceiptScannerScreen> {
     if (receipt.hasExtractedItems) {
       try {
         aiResult = ReceiptAiResult.fromJsonString(receipt.extractedItemsJson!);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Receipt AI result parse failed: $e');
+      }
     }
     final hasItems = aiResult != null && aiResult.items.isNotEmpty;
 

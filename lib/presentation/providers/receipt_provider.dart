@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../domain/models/receipt.dart' as domain;
@@ -191,7 +192,9 @@ class ReceiptNotifier extends StateNotifier<ReceiptState> {
               ocrStatus: drift.Value('failed'),
             ),
           );
-        } catch (_) {}
+        } catch (e2) {
+          debugPrint('Failed to update receipt status to failed: $e2');
+        }
       }
 
       final errorMessage = ErrorHandler.handle(error, stackTrace);

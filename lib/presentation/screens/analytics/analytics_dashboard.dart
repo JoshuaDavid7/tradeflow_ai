@@ -293,7 +293,7 @@ class _AnalyticsDashboardState extends ConsumerState<AnalyticsDashboard>
           child: _HeroCard(
             title: 'Spent',
             value: '$cs${analytics.monthlyExpenses.toStringAsFixed(0)}',
-            subtitle: 'Expenses logged',
+            subtitle: 'Total costs',
             icon: Icons.arrow_downward,
             color: AppColors.expense(context),
           ),

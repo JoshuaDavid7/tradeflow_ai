@@ -5212,6 +5212,12 @@ class $BusinessSettingsTable extends BusinessSettings
   late final GeneratedColumn<String> invoicePrefix = GeneratedColumn<String>(
       'invoice_prefix', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _quotePrefixMeta =
+      const VerificationMeta('quotePrefix');
+  @override
+  late final GeneratedColumn<String> quotePrefix = GeneratedColumn<String>(
+      'quote_prefix', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _nextInvoiceNumberMeta =
       const VerificationMeta('nextInvoiceNumber');
   @override
@@ -5220,6 +5226,22 @@ class $BusinessSettingsTable extends BusinessSettings
       type: DriftSqlType.int,
       requiredDuringInsert: false,
       defaultValue: const Constant(1));
+  static const VerificationMeta _defaultDueDaysMeta =
+      const VerificationMeta('defaultDueDays');
+  @override
+  late final GeneratedColumn<int> defaultDueDays = GeneratedColumn<int>(
+      'default_due_days', aliasedName, false,
+      type: DriftSqlType.int,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(14));
+  static const VerificationMeta _defaultMarkupPercentMeta =
+      const VerificationMeta('defaultMarkupPercent');
+  @override
+  late final GeneratedColumn<double> defaultMarkupPercent =
+      GeneratedColumn<double>('default_markup_percent', aliasedName, false,
+          type: DriftSqlType.double,
+          requiredDuringInsert: false,
+          defaultValue: const Constant(0.0));
   static const VerificationMeta _defaultPaymentTermsMeta =
       const VerificationMeta('defaultPaymentTerms');
   @override
@@ -5272,7 +5294,10 @@ class $BusinessSettingsTable extends BusinessSettings
         defaultTaxRate,
         currencySymbol,
         invoicePrefix,
+        quotePrefix,
         nextInvoiceNumber,
+        defaultDueDays,
+        defaultMarkupPercent,
         defaultPaymentTerms,
         isPro,
         subscriptionStatus,
@@ -5349,11 +5374,29 @@ class $BusinessSettingsTable extends BusinessSettings
           invoicePrefix.isAcceptableOrUnknown(
               data['invoice_prefix']!, _invoicePrefixMeta));
     }
+    if (data.containsKey('quote_prefix')) {
+      context.handle(
+          _quotePrefixMeta,
+          quotePrefix.isAcceptableOrUnknown(
+              data['quote_prefix']!, _quotePrefixMeta));
+    }
     if (data.containsKey('next_invoice_number')) {
       context.handle(
           _nextInvoiceNumberMeta,
           nextInvoiceNumber.isAcceptableOrUnknown(
               data['next_invoice_number']!, _nextInvoiceNumberMeta));
+    }
+    if (data.containsKey('default_due_days')) {
+      context.handle(
+          _defaultDueDaysMeta,
+          defaultDueDays.isAcceptableOrUnknown(
+              data['default_due_days']!, _defaultDueDaysMeta));
+    }
+    if (data.containsKey('default_markup_percent')) {
+      context.handle(
+          _defaultMarkupPercentMeta,
+          defaultMarkupPercent.isAcceptableOrUnknown(
+              data['default_markup_percent']!, _defaultMarkupPercentMeta));
     }
     if (data.containsKey('default_payment_terms')) {
       context.handle(
@@ -5408,8 +5451,15 @@ class $BusinessSettingsTable extends BusinessSettings
           DriftSqlType.string, data['${effectivePrefix}currency_symbol'])!,
       invoicePrefix: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}invoice_prefix']),
+      quotePrefix: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}quote_prefix']),
       nextInvoiceNumber: attachedDatabase.typeMapping.read(
           DriftSqlType.int, data['${effectivePrefix}next_invoice_number'])!,
+      defaultDueDays: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}default_due_days'])!,
+      defaultMarkupPercent: attachedDatabase.typeMapping.read(
+          DriftSqlType.double,
+          data['${effectivePrefix}default_markup_percent'])!,
       defaultPaymentTerms: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}default_payment_terms']),
       isPro: attachedDatabase.typeMapping
@@ -5440,7 +5490,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
   final double defaultTaxRate;
   final String currencySymbol;
   final String? invoicePrefix;
+  final String? quotePrefix;
   final int nextInvoiceNumber;
+  final int defaultDueDays;
+  final double defaultMarkupPercent;
   final String? defaultPaymentTerms;
   final bool isPro;
   final String subscriptionStatus;
@@ -5457,7 +5510,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       required this.defaultTaxRate,
       required this.currencySymbol,
       this.invoicePrefix,
+      this.quotePrefix,
       required this.nextInvoiceNumber,
+      required this.defaultDueDays,
+      required this.defaultMarkupPercent,
       this.defaultPaymentTerms,
       required this.isPro,
       required this.subscriptionStatus,
@@ -5486,7 +5542,12 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
     if (!nullToAbsent || invoicePrefix != null) {
       map['invoice_prefix'] = Variable<String>(invoicePrefix);
     }
+    if (!nullToAbsent || quotePrefix != null) {
+      map['quote_prefix'] = Variable<String>(quotePrefix);
+    }
     map['next_invoice_number'] = Variable<int>(nextInvoiceNumber);
+    map['default_due_days'] = Variable<int>(defaultDueDays);
+    map['default_markup_percent'] = Variable<double>(defaultMarkupPercent);
     if (!nullToAbsent || defaultPaymentTerms != null) {
       map['default_payment_terms'] = Variable<String>(defaultPaymentTerms);
     }
@@ -5518,7 +5579,12 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       invoicePrefix: invoicePrefix == null && nullToAbsent
           ? const Value.absent()
           : Value(invoicePrefix),
+      quotePrefix: quotePrefix == null && nullToAbsent
+          ? const Value.absent()
+          : Value(quotePrefix),
       nextInvoiceNumber: Value(nextInvoiceNumber),
+      defaultDueDays: Value(defaultDueDays),
+      defaultMarkupPercent: Value(defaultMarkupPercent),
       defaultPaymentTerms: defaultPaymentTerms == null && nullToAbsent
           ? const Value.absent()
           : Value(defaultPaymentTerms),
@@ -5543,7 +5609,11 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       defaultTaxRate: serializer.fromJson<double>(json['defaultTaxRate']),
       currencySymbol: serializer.fromJson<String>(json['currencySymbol']),
       invoicePrefix: serializer.fromJson<String?>(json['invoicePrefix']),
+      quotePrefix: serializer.fromJson<String?>(json['quotePrefix']),
       nextInvoiceNumber: serializer.fromJson<int>(json['nextInvoiceNumber']),
+      defaultDueDays: serializer.fromJson<int>(json['defaultDueDays']),
+      defaultMarkupPercent:
+          serializer.fromJson<double>(json['defaultMarkupPercent']),
       defaultPaymentTerms:
           serializer.fromJson<String?>(json['defaultPaymentTerms']),
       isPro: serializer.fromJson<bool>(json['isPro']),
@@ -5567,7 +5637,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       'defaultTaxRate': serializer.toJson<double>(defaultTaxRate),
       'currencySymbol': serializer.toJson<String>(currencySymbol),
       'invoicePrefix': serializer.toJson<String?>(invoicePrefix),
+      'quotePrefix': serializer.toJson<String?>(quotePrefix),
       'nextInvoiceNumber': serializer.toJson<int>(nextInvoiceNumber),
+      'defaultDueDays': serializer.toJson<int>(defaultDueDays),
+      'defaultMarkupPercent': serializer.toJson<double>(defaultMarkupPercent),
       'defaultPaymentTerms': serializer.toJson<String?>(defaultPaymentTerms),
       'isPro': serializer.toJson<bool>(isPro),
       'subscriptionStatus': serializer.toJson<String>(subscriptionStatus),
@@ -5587,7 +5660,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
           double? defaultTaxRate,
           String? currencySymbol,
           Value<String?> invoicePrefix = const Value.absent(),
+          Value<String?> quotePrefix = const Value.absent(),
           int? nextInvoiceNumber,
+          int? defaultDueDays,
+          double? defaultMarkupPercent,
           Value<String?> defaultPaymentTerms = const Value.absent(),
           bool? isPro,
           String? subscriptionStatus,
@@ -5609,7 +5685,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
         currencySymbol: currencySymbol ?? this.currencySymbol,
         invoicePrefix:
             invoicePrefix.present ? invoicePrefix.value : this.invoicePrefix,
+        quotePrefix: quotePrefix.present ? quotePrefix.value : this.quotePrefix,
         nextInvoiceNumber: nextInvoiceNumber ?? this.nextInvoiceNumber,
+        defaultDueDays: defaultDueDays ?? this.defaultDueDays,
+        defaultMarkupPercent: defaultMarkupPercent ?? this.defaultMarkupPercent,
         defaultPaymentTerms: defaultPaymentTerms.present
             ? defaultPaymentTerms.value
             : this.defaultPaymentTerms,
@@ -5646,9 +5725,17 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       invoicePrefix: data.invoicePrefix.present
           ? data.invoicePrefix.value
           : this.invoicePrefix,
+      quotePrefix:
+          data.quotePrefix.present ? data.quotePrefix.value : this.quotePrefix,
       nextInvoiceNumber: data.nextInvoiceNumber.present
           ? data.nextInvoiceNumber.value
           : this.nextInvoiceNumber,
+      defaultDueDays: data.defaultDueDays.present
+          ? data.defaultDueDays.value
+          : this.defaultDueDays,
+      defaultMarkupPercent: data.defaultMarkupPercent.present
+          ? data.defaultMarkupPercent.value
+          : this.defaultMarkupPercent,
       defaultPaymentTerms: data.defaultPaymentTerms.present
           ? data.defaultPaymentTerms.value
           : this.defaultPaymentTerms,
@@ -5674,7 +5761,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
           ..write('defaultTaxRate: $defaultTaxRate, ')
           ..write('currencySymbol: $currencySymbol, ')
           ..write('invoicePrefix: $invoicePrefix, ')
+          ..write('quotePrefix: $quotePrefix, ')
           ..write('nextInvoiceNumber: $nextInvoiceNumber, ')
+          ..write('defaultDueDays: $defaultDueDays, ')
+          ..write('defaultMarkupPercent: $defaultMarkupPercent, ')
           ..write('defaultPaymentTerms: $defaultPaymentTerms, ')
           ..write('isPro: $isPro, ')
           ..write('subscriptionStatus: $subscriptionStatus, ')
@@ -5696,7 +5786,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       defaultTaxRate,
       currencySymbol,
       invoicePrefix,
+      quotePrefix,
       nextInvoiceNumber,
+      defaultDueDays,
+      defaultMarkupPercent,
       defaultPaymentTerms,
       isPro,
       subscriptionStatus,
@@ -5716,7 +5809,10 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
           other.defaultTaxRate == this.defaultTaxRate &&
           other.currencySymbol == this.currencySymbol &&
           other.invoicePrefix == this.invoicePrefix &&
+          other.quotePrefix == this.quotePrefix &&
           other.nextInvoiceNumber == this.nextInvoiceNumber &&
+          other.defaultDueDays == this.defaultDueDays &&
+          other.defaultMarkupPercent == this.defaultMarkupPercent &&
           other.defaultPaymentTerms == this.defaultPaymentTerms &&
           other.isPro == this.isPro &&
           other.subscriptionStatus == this.subscriptionStatus &&
@@ -5735,7 +5831,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
   final Value<double> defaultTaxRate;
   final Value<String> currencySymbol;
   final Value<String?> invoicePrefix;
+  final Value<String?> quotePrefix;
   final Value<int> nextInvoiceNumber;
+  final Value<int> defaultDueDays;
+  final Value<double> defaultMarkupPercent;
   final Value<String?> defaultPaymentTerms;
   final Value<bool> isPro;
   final Value<String> subscriptionStatus;
@@ -5753,7 +5852,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     this.defaultTaxRate = const Value.absent(),
     this.currencySymbol = const Value.absent(),
     this.invoicePrefix = const Value.absent(),
+    this.quotePrefix = const Value.absent(),
     this.nextInvoiceNumber = const Value.absent(),
+    this.defaultDueDays = const Value.absent(),
+    this.defaultMarkupPercent = const Value.absent(),
     this.defaultPaymentTerms = const Value.absent(),
     this.isPro = const Value.absent(),
     this.subscriptionStatus = const Value.absent(),
@@ -5772,7 +5874,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     this.defaultTaxRate = const Value.absent(),
     this.currencySymbol = const Value.absent(),
     this.invoicePrefix = const Value.absent(),
+    this.quotePrefix = const Value.absent(),
     this.nextInvoiceNumber = const Value.absent(),
+    this.defaultDueDays = const Value.absent(),
+    this.defaultMarkupPercent = const Value.absent(),
     this.defaultPaymentTerms = const Value.absent(),
     this.isPro = const Value.absent(),
     this.subscriptionStatus = const Value.absent(),
@@ -5792,7 +5897,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     Expression<double>? defaultTaxRate,
     Expression<String>? currencySymbol,
     Expression<String>? invoicePrefix,
+    Expression<String>? quotePrefix,
     Expression<int>? nextInvoiceNumber,
+    Expression<int>? defaultDueDays,
+    Expression<double>? defaultMarkupPercent,
     Expression<String>? defaultPaymentTerms,
     Expression<bool>? isPro,
     Expression<String>? subscriptionStatus,
@@ -5811,7 +5919,11 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
       if (defaultTaxRate != null) 'default_tax_rate': defaultTaxRate,
       if (currencySymbol != null) 'currency_symbol': currencySymbol,
       if (invoicePrefix != null) 'invoice_prefix': invoicePrefix,
+      if (quotePrefix != null) 'quote_prefix': quotePrefix,
       if (nextInvoiceNumber != null) 'next_invoice_number': nextInvoiceNumber,
+      if (defaultDueDays != null) 'default_due_days': defaultDueDays,
+      if (defaultMarkupPercent != null)
+        'default_markup_percent': defaultMarkupPercent,
       if (defaultPaymentTerms != null)
         'default_payment_terms': defaultPaymentTerms,
       if (isPro != null) 'is_pro': isPro,
@@ -5833,7 +5945,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
       Value<double>? defaultTaxRate,
       Value<String>? currencySymbol,
       Value<String?>? invoicePrefix,
+      Value<String?>? quotePrefix,
       Value<int>? nextInvoiceNumber,
+      Value<int>? defaultDueDays,
+      Value<double>? defaultMarkupPercent,
       Value<String?>? defaultPaymentTerms,
       Value<bool>? isPro,
       Value<String>? subscriptionStatus,
@@ -5851,7 +5966,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
       defaultTaxRate: defaultTaxRate ?? this.defaultTaxRate,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       invoicePrefix: invoicePrefix ?? this.invoicePrefix,
+      quotePrefix: quotePrefix ?? this.quotePrefix,
       nextInvoiceNumber: nextInvoiceNumber ?? this.nextInvoiceNumber,
+      defaultDueDays: defaultDueDays ?? this.defaultDueDays,
+      defaultMarkupPercent: defaultMarkupPercent ?? this.defaultMarkupPercent,
       defaultPaymentTerms: defaultPaymentTerms ?? this.defaultPaymentTerms,
       isPro: isPro ?? this.isPro,
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
@@ -5894,8 +6012,18 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     if (invoicePrefix.present) {
       map['invoice_prefix'] = Variable<String>(invoicePrefix.value);
     }
+    if (quotePrefix.present) {
+      map['quote_prefix'] = Variable<String>(quotePrefix.value);
+    }
     if (nextInvoiceNumber.present) {
       map['next_invoice_number'] = Variable<int>(nextInvoiceNumber.value);
+    }
+    if (defaultDueDays.present) {
+      map['default_due_days'] = Variable<int>(defaultDueDays.value);
+    }
+    if (defaultMarkupPercent.present) {
+      map['default_markup_percent'] =
+          Variable<double>(defaultMarkupPercent.value);
     }
     if (defaultPaymentTerms.present) {
       map['default_payment_terms'] =
@@ -5932,7 +6060,10 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
           ..write('defaultTaxRate: $defaultTaxRate, ')
           ..write('currencySymbol: $currencySymbol, ')
           ..write('invoicePrefix: $invoicePrefix, ')
+          ..write('quotePrefix: $quotePrefix, ')
           ..write('nextInvoiceNumber: $nextInvoiceNumber, ')
+          ..write('defaultDueDays: $defaultDueDays, ')
+          ..write('defaultMarkupPercent: $defaultMarkupPercent, ')
           ..write('defaultPaymentTerms: $defaultPaymentTerms, ')
           ..write('isPro: $isPro, ')
           ..write('subscriptionStatus: $subscriptionStatus, ')
@@ -9745,7 +9876,10 @@ typedef $$BusinessSettingsTableCreateCompanionBuilder
   Value<double> defaultTaxRate,
   Value<String> currencySymbol,
   Value<String?> invoicePrefix,
+  Value<String?> quotePrefix,
   Value<int> nextInvoiceNumber,
+  Value<int> defaultDueDays,
+  Value<double> defaultMarkupPercent,
   Value<String?> defaultPaymentTerms,
   Value<bool> isPro,
   Value<String> subscriptionStatus,
@@ -9765,7 +9899,10 @@ typedef $$BusinessSettingsTableUpdateCompanionBuilder
   Value<double> defaultTaxRate,
   Value<String> currencySymbol,
   Value<String?> invoicePrefix,
+  Value<String?> quotePrefix,
   Value<int> nextInvoiceNumber,
+  Value<int> defaultDueDays,
+  Value<double> defaultMarkupPercent,
   Value<String?> defaultPaymentTerms,
   Value<bool> isPro,
   Value<String> subscriptionStatus,
@@ -9817,8 +9954,19 @@ class $$BusinessSettingsTableFilterComposer
   ColumnFilters<String> get invoicePrefix => $composableBuilder(
       column: $table.invoicePrefix, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<String> get quotePrefix => $composableBuilder(
+      column: $table.quotePrefix, builder: (column) => ColumnFilters(column));
+
   ColumnFilters<int> get nextInvoiceNumber => $composableBuilder(
       column: $table.nextInvoiceNumber,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get defaultDueDays => $composableBuilder(
+      column: $table.defaultDueDays,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get defaultMarkupPercent => $composableBuilder(
+      column: $table.defaultMarkupPercent,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get defaultPaymentTerms => $composableBuilder(
@@ -9886,8 +10034,19 @@ class $$BusinessSettingsTableOrderingComposer
       column: $table.invoicePrefix,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get quotePrefix => $composableBuilder(
+      column: $table.quotePrefix, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get nextInvoiceNumber => $composableBuilder(
       column: $table.nextInvoiceNumber,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get defaultDueDays => $composableBuilder(
+      column: $table.defaultDueDays,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get defaultMarkupPercent => $composableBuilder(
+      column: $table.defaultMarkupPercent,
       builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get defaultPaymentTerms => $composableBuilder(
@@ -9947,8 +10106,17 @@ class $$BusinessSettingsTableAnnotationComposer
   GeneratedColumn<String> get invoicePrefix => $composableBuilder(
       column: $table.invoicePrefix, builder: (column) => column);
 
+  GeneratedColumn<String> get quotePrefix => $composableBuilder(
+      column: $table.quotePrefix, builder: (column) => column);
+
   GeneratedColumn<int> get nextInvoiceNumber => $composableBuilder(
       column: $table.nextInvoiceNumber, builder: (column) => column);
+
+  GeneratedColumn<int> get defaultDueDays => $composableBuilder(
+      column: $table.defaultDueDays, builder: (column) => column);
+
+  GeneratedColumn<double> get defaultMarkupPercent => $composableBuilder(
+      column: $table.defaultMarkupPercent, builder: (column) => column);
 
   GeneratedColumn<String> get defaultPaymentTerms => $composableBuilder(
       column: $table.defaultPaymentTerms, builder: (column) => column);
@@ -10003,7 +10171,10 @@ class $$BusinessSettingsTableTableManager extends RootTableManager<
             Value<double> defaultTaxRate = const Value.absent(),
             Value<String> currencySymbol = const Value.absent(),
             Value<String?> invoicePrefix = const Value.absent(),
+            Value<String?> quotePrefix = const Value.absent(),
             Value<int> nextInvoiceNumber = const Value.absent(),
+            Value<int> defaultDueDays = const Value.absent(),
+            Value<double> defaultMarkupPercent = const Value.absent(),
             Value<String?> defaultPaymentTerms = const Value.absent(),
             Value<bool> isPro = const Value.absent(),
             Value<String> subscriptionStatus = const Value.absent(),
@@ -10022,7 +10193,10 @@ class $$BusinessSettingsTableTableManager extends RootTableManager<
             defaultTaxRate: defaultTaxRate,
             currencySymbol: currencySymbol,
             invoicePrefix: invoicePrefix,
+            quotePrefix: quotePrefix,
             nextInvoiceNumber: nextInvoiceNumber,
+            defaultDueDays: defaultDueDays,
+            defaultMarkupPercent: defaultMarkupPercent,
             defaultPaymentTerms: defaultPaymentTerms,
             isPro: isPro,
             subscriptionStatus: subscriptionStatus,
@@ -10041,7 +10215,10 @@ class $$BusinessSettingsTableTableManager extends RootTableManager<
             Value<double> defaultTaxRate = const Value.absent(),
             Value<String> currencySymbol = const Value.absent(),
             Value<String?> invoicePrefix = const Value.absent(),
+            Value<String?> quotePrefix = const Value.absent(),
             Value<int> nextInvoiceNumber = const Value.absent(),
+            Value<int> defaultDueDays = const Value.absent(),
+            Value<double> defaultMarkupPercent = const Value.absent(),
             Value<String?> defaultPaymentTerms = const Value.absent(),
             Value<bool> isPro = const Value.absent(),
             Value<String> subscriptionStatus = const Value.absent(),
@@ -10060,7 +10237,10 @@ class $$BusinessSettingsTableTableManager extends RootTableManager<
             defaultTaxRate: defaultTaxRate,
             currencySymbol: currencySymbol,
             invoicePrefix: invoicePrefix,
+            quotePrefix: quotePrefix,
             nextInvoiceNumber: nextInvoiceNumber,
+            defaultDueDays: defaultDueDays,
+            defaultMarkupPercent: defaultMarkupPercent,
             defaultPaymentTerms: defaultPaymentTerms,
             isPro: isPro,
             subscriptionStatus: subscriptionStatus,

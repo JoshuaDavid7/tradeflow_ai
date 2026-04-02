@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +44,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Privacy consent
   bool _acceptedTerms = false;
 
-  static const _totalPages = 8;
+  static const _totalPages = 6;
 
   @override
   void dispose() {
@@ -100,8 +99,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildWelcomePage(),
-                  _buildVoicePage(),
-                  _buildFeaturesPage(),
                   _buildSetupPage(),
                   _buildAddressPage(),
                   _buildLogoPage(),
@@ -127,8 +124,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: const Text('Back'),
                     ),
                   const Spacer(),
-                  // Show Skip button on the 3 new optional pages (indices 4, 5, 6)
-                  if (_currentPage >= 4 && _currentPage <= 6)
+                  // Show Skip button on the 3 optional pages (indices 2, 3, 4)
+                  if (_currentPage >= 2 && _currentPage <= 4)
                     Padding(
                       padding: const EdgeInsets.only(right: 12),
                       child: TextButton(
@@ -218,137 +215,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: textTheme.bodyLarge?.copyWith(
               color: colorScheme.onSurfaceVariant,
               height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVoicePage() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.4),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(Icons.record_voice_over,
-                size: 48, color: colorScheme.primary),
-          ),
-          const SizedBox(height: 32),
-          Text('Speak, Don\'t Type',
-              style: textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              )),
-          const SizedBox(height: 16),
-          Text(
-            'Just talk naturally about the job \u2014 mention the client, materials, hours, and costs. Our AI extracts everything into a professional invoice or quote.',
-            textAlign: TextAlign.center,
-            style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 32),
-          // Example bubble
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colorScheme.outlineVariant),
-            ),
-            child: Column(
-              children: [
-                Icon(Icons.format_quote,
-                    color: colorScheme.primary.withValues(alpha: 0.5),
-                    size: 24),
-                const SizedBox(height: 8),
-                Text(
-                  '\u201cInvoice David for 3 hours work, materials were two copper pipes at 25 each and a valve at 50 dollars\u201d',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.lora(
-                    textStyle: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.primary,
-                      fontStyle: FontStyle.italic,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturesPage() {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text('Everything You Need',
-              style: textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              )),
-          const SizedBox(height: 32),
-          _featureItem(Icons.mic, 'Voice to Invoice',
-              'Speak naturally, get professional invoices'),
-          _featureItem(Icons.receipt_long, 'AI Receipt Scanner',
-              'Snap a receipt \u2014 AI extracts every line item'),
-          _featureItem(Icons.payment, 'Stripe Payments',
-              'Add payment links and QR codes to invoices'),
-          _featureItem(Icons.analytics, 'Analytics',
-              'Charts for revenue, expenses, and profit'),
-          _featureItem(Icons.people, 'Customer Ledger',
-              'Full client history and job tracking'),
-          _featureItem(Icons.design_services, 'Custom Templates',
-              'Your logo, colours, and branding on PDFs'),
-        ],
-      ),
-    );
-  }
-
-  Widget _featureItem(IconData icon, String title, String subtitle) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: colorScheme.primary, size: 22),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleSmall),
-                Text(subtitle,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    )),
-              ],
             ),
           ),
         ],
@@ -920,8 +786,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       if (_logoFile != null) {
         await _uploadLogo(supabase, userId);
       }
-    } catch (_) {
-      // Non-critical — user can set up later
+    } catch (e) {
+      debugPrint('Profile save during onboarding failed (non-critical): $e');
     }
   }
 
@@ -948,8 +814,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         'logo_url': logoUrl,
         'updated_at': DateTime.now().toIso8601String(),
       });
-    } catch (_) {
-      // Non-critical — user can upload later from template editor
+    } catch (e) {
+      debugPrint('Logo upload during onboarding failed (non-critical): $e');
     }
   }
 }
@@ -964,7 +830,8 @@ class OnboardingHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       return prefs.getBool(_keyForUser(userId)) ?? false;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Onboarding completion check failed: $e');
       return false;
     }
   }
@@ -973,8 +840,8 @@ class OnboardingHelper {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyForUser(userId), true);
-    } catch (_) {
-      // Non-critical
+    } catch (e) {
+      debugPrint('Onboarding mark complete failed (non-critical): $e');
     }
   }
 

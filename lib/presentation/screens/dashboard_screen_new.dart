@@ -18,6 +18,7 @@ import 'package:uuid/uuid.dart';
 import 'package:tradeflow_ai/presentation/widgets/shimmer_loading.dart';
 import 'package:tradeflow_ai/core/theme/app_theme.dart';
 import 'package:tradeflow_ai/data/services/supabase_service.dart';
+import 'package:tradeflow_ai/data/services/demo_data_service.dart';
 import 'package:tradeflow_ai/presentation/providers/customer_ledger_provider.dart';
 import 'main_shell_screen.dart';
 import '../../screens/draft_review_screen.dart';
@@ -89,7 +90,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    // ── Auto-dismiss voice errors via SnackBar ──
+    // ── Auto-dismiss voice errors & stale processing states ──
     ref.listen<VoiceCaptureProgress>(voiceCaptureProvider, (prev, next) {
       if (next.state == VoiceCaptureState.error &&
           (next.error?.trim().isNotEmpty ?? false)) {
@@ -121,6 +122,20 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
           }
         });
       }
+
+      // Auto-reset stale processing states (stuck > 60s)
+      if (next.isActive &&
+          next.state != VoiceCaptureState.recording &&
+          prev?.state == next.state) {
+        Future.delayed(const Duration(seconds: 60), () {
+          if (mounted) {
+            final current = ref.read(voiceCaptureProvider);
+            if (current.state == next.state) {
+              ref.read(voiceCaptureProvider.notifier).reset();
+            }
+          }
+        });
+      }
     });
 
     return Scaffold(
@@ -143,9 +158,6 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
               surfaceTintColor: Colors.transparent,
               title: Text(
                 profile?.businessName ?? 'Your Business',
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -540,7 +552,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
         label: const Text(
           'Create',
           style: TextStyle(
-            fontSize: 15,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -587,9 +599,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
               // Title
               Text(
                 'Create new',
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: AppTextStyles.sheetTitle(textTheme),
               ),
               const SizedBox(height: 20),
               // Row 1: Invoice + Quote
@@ -771,8 +781,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
               Expanded(
                 child: Text(
                   label,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                  style: AppTextStyles.cardTitle(textTheme).copyWith(
                     color: colorScheme.onSurface,
                   ),
                   maxLines: 1,
@@ -804,7 +813,9 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
           .eq('user_id', userId)
           .order('name');
       customers = List<Map<String, dynamic>>.from(data as List);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Customer fetch for note linking failed: $e');
+    }
 
     if (!mounted) return;
 
@@ -844,16 +855,16 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Create note for',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: AppTextStyles.sheetTitle(Theme.of(context).textTheme),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       'Choose a client',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.onSurfaceVariant,
+                      style: AppTextStyles.cardSubtitle(
+                        Theme.of(context).textTheme,
+                        Theme.of(context).colorScheme,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -873,7 +884,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                                     color: colorScheme.primary, size: 20),
                               ),
                               title: const Text('New client',
-                                  style: TextStyle(fontWeight: FontWeight.w600)),
+                                  style: TextStyle(fontWeight: FontWeight.w700)),
                               subtitle: const Text('Create and start a note'),
                               onTap: () {
                                 Navigator.pop(ctx);
@@ -895,7 +906,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                             ),
                             title: Text(
                               c['name'] ?? 'Unknown',
-                              style: const TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             onTap: () {
                               Navigator.pop(ctx);
@@ -967,9 +978,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
             ),
             Text(
               'New client for note',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: AppTextStyles.sheetTitle(Theme.of(context).textTheme),
             ),
             const SizedBox(height: 4),
             Text(
@@ -1065,6 +1074,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
   ) {
     final textTheme = Theme.of(context).textTheme;
     final isRecording = voiceProgress.state == VoiceCaptureState.recording;
+    // Guard: disable tap while the voice pipeline is processing (upload/transcribe/extract)
+    final isProcessing = voiceProgress.isActive && !isRecording;
 
     return Column(
       children: [
@@ -1073,20 +1084,40 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () async {
+            onTap: isProcessing ? null : () async {
               unawaited(HapticFeedback.mediumImpact());
               final notifier = ref.read(voiceCaptureProvider.notifier);
               if (isRecording) {
-                final result = await notifier.stopAndProcess();
-                if (result != null && mounted) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => DraftReviewScreen(
-                        jobData: result.extractedData,
+                try {
+                  final result = await notifier.stopAndProcess();
+                  if (result != null && mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DraftReviewScreen(
+                          jobData: result.extractedData,
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  } else if (mounted) {
+                    final progress = ref.read(voiceCaptureProvider);
+                    final errorMsg = progress.error ?? 'Voice processing failed. Please try again.';
+                    showDialog(context: context, builder: (_) => AlertDialog(
+                      title: const Text('Voice Error'),
+                      content: SelectableText(errorMsg),
+                      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+                    ));
+                    notifier.reset();
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    showDialog(context: context, builder: (_) => AlertDialog(
+                      title: const Text('Voice Error'),
+                      content: SelectableText('$e'),
+                      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+                    ));
+                    notifier.reset();
+                  }
                 }
               } else {
                 await notifier.startRecording();
@@ -1169,10 +1200,28 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
             ),
           ),
         ),
-        // Voice processing indicator (below the card)
+        // Voice processing indicator (below the card) — tappable to dismiss
         if (voiceProgress.isActive && !isRecording) ...[
           const SizedBox(height: 12),
-          VoiceProcessingIndicator(progress: voiceProgress),
+          GestureDetector(
+            onTap: () {
+              ref.read(voiceCaptureProvider.notifier).reset();
+            },
+            child: Stack(
+              children: [
+                VoiceProcessingIndicator(progress: voiceProgress),
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ],
     );
@@ -1283,9 +1332,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                           children: [
                             Text(
                               job.clientName,
-                              style: textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style: AppTextStyles.cardTitle(textTheme),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1306,8 +1353,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                       // Amount due
                       Text(
                         '$currencySymbol${job.amountDue.toStringAsFixed(0)}',
-                        style: textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+                        style: AppTextStyles.cardAmount(textTheme).copyWith(
                           color: isOverdue
                               ? AppColors.overdue(context)
                               : null,
@@ -1431,18 +1477,15 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                             children: [
                               Text(
                                 job.clientName,
-                                style: textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                                style: AppTextStyles.cardTitle(textTheme),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
                                 subtitle,
-                                style: textTheme.bodySmall?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                style: AppTextStyles.cardSubtitle(
+                                    textTheme, colorScheme),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -1456,9 +1499,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                           children: [
                             Text(
                               '$currencySymbol${job.totalAmount.toStringAsFixed(0)}',
-                              style: textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: AppTextStyles.cardAmount(textTheme),
                             ),
                             const SizedBox(height: 2),
                             _buildJobStatusChip(context, job),
@@ -1483,16 +1524,13 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(title,
-            style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.2,
-            )),
+            style: AppTextStyles.sectionHeader(textTheme)),
         TextButton(
           onPressed: onSeeAll,
           style: TextButton.styleFrom(
             foregroundColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
           child: const Text('See All'),
         ),
@@ -1564,12 +1602,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
           const SizedBox(width: 3),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: color,
-              letterSpacing: 0.2,
-            ),
+            style: AppTextStyles.badge(color),
           ),
         ],
       ),
@@ -1582,7 +1615,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
@@ -1592,29 +1625,83 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            size: 32,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+          // Header
+          Row(
+            children: [
+              Icon(Icons.rocket_launch_outlined,
+                  size: 22, color: colorScheme.primary),
+              const SizedBox(width: 10),
+              Text('Get started',
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  )),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            'No jobs yet',
-            style: textTheme.titleSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tap + Create above to get started',
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-            ),
-            textAlign: TextAlign.center,
-          ),
+          const SizedBox(height: 14),
+
+          // Quick steps
+          _firstStepRow(context, Icons.mic, 'Record a voice memo',
+              'Describe a job — AI creates the invoice'),
+          const SizedBox(height: 10),
+          _firstStepRow(context, Icons.receipt_long, 'Create an invoice or quote',
+              'Tap + Create above'),
+          const SizedBox(height: 10),
+          _firstStepRow(context, Icons.document_scanner, 'Scan a receipt',
+              'AI extracts line items and costs'),
+
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+
+          // Demo data option
+          _DemoDataButton(onLoaded: () {
+            ref.invalidate(jobStatsProvider);
+            ref.invalidate(jobListProvider);
+            ref.read(analyticsProvider.notifier).refresh();
+            ref.invalidate(customerLedgerListProvider);
+            ref.invalidate(expenseStatsProvider);
+          }),
         ],
       ),
+    );
+  }
+
+  Widget _firstStepRow(
+      BuildContext context, IconData icon, String title, String subtitle) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(icon, size: 15, color: colorScheme.primary),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  )),
+              Text(subtitle,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  )),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -1660,9 +1747,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                 // Centered title (matches create sheet)
                 Text(
                   'Select month',
-                  style: sheetTextTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: AppTextStyles.sheetTitle(sheetTextTheme),
                 ),
                 const SizedBox(height: 12),
                 Flexible(
@@ -1693,7 +1778,9 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                         onTap: () {
                           setState(() => _selectedMonth = month);
                           Navigator.pop(ctx);
-                          // Load analytics for the selected month
+                          // Sync with the global analytics month so the
+                          // Analytics tab shows the same period.
+                          ref.read(selectedAnalyticsMonthProvider.notifier).state = month;
                           ref.read(analyticsProvider.notifier).loadAnalytics(month: month);
                         },
                       );
@@ -1741,5 +1828,71 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
       case JobStatus.draft:
         return Icons.edit_rounded;
     }
+  }
+}
+
+/// Stateful widget for the "Load sample data" button on the dashboard empty state.
+class _DemoDataButton extends StatefulWidget {
+  final VoidCallback onLoaded;
+
+  const _DemoDataButton({required this.onLoaded});
+
+  @override
+  State<_DemoDataButton> createState() => _DemoDataButtonState();
+}
+
+class _DemoDataButtonState extends State<_DemoDataButton> {
+  bool _loading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+
+    return Row(
+      children: [
+        Icon(Icons.science_outlined,
+            size: 16, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Want to explore first?',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 32,
+          child: TextButton(
+            onPressed: _loading || userId == null
+                ? null
+                : () async {
+                    setState(() => _loading = true);
+                    try {
+                      await DemoDataService.seed(userId);
+                      widget.onLoaded();
+                    } catch (_) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Could not load sample data')),
+                        );
+                      }
+                    }
+                    if (mounted) setState(() => _loading = false);
+                  },
+            child: _loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Load sample data'),
+          ),
+        ),
+      ],
+    );
   }
 }

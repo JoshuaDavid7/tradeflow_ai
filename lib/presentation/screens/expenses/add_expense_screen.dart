@@ -9,6 +9,9 @@ import 'package:tradeflow_ai/domain/models/expense.dart';
 import 'package:tradeflow_ai/domain/models/receipt.dart' as domain_receipt;
 import '../../../core/theme/app_theme.dart';
 import '../../providers/expense_provider.dart';
+import '../../providers/analytics_provider.dart';
+import '../../../domain/models/job.dart';
+import '../../providers/job_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/receipt_provider.dart';
 import '../receipts/receipt_scanner_screen.dart';
@@ -46,8 +49,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String? _receiptPath;
   String? _linkedReceiptId;
   String? _receiptOcrText;
-  String? _selectedCustomerId;
-  String? _selectedCustomerName;
+  final Set<int> _deselectedReceiptItems = {};
+  String? _selectedJobId;
+  String? _selectedJobTitle;
+  String? _selectedJobClientName;
   bool get _isEditing => widget.existingExpense != null;
 
   @override
@@ -64,7 +69,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _taxDeductible = e.taxDeductible;
       _receiptPath = e.receiptPath;
       _receiptOcrText = e.ocrText;
-      _selectedCustomerId = e.customerId;
+      _selectedJobId = e.jobId ?? widget.jobId;
     } else if (widget.prefilledReceipt != null) {
       _applyScannedReceipt(widget.prefilledReceipt!, shouldNotify: false);
     }
@@ -138,6 +143,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           children: [
             // Description
             TextFormField(
+              key: const ValueKey('expense_description'),
               controller: _descriptionController,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
@@ -156,6 +162,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
             // Amount
             TextFormField(
+              key: const ValueKey('expense_amount'),
               controller: _amountController,
               decoration: InputDecoration(
                 labelText: 'Amount *',
@@ -314,8 +321,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Link to Client (optional)
-            _buildClientPicker(),
+            // Assign to Job (optional)
+            _buildJobPicker(),
             const SizedBox(height: 20),
 
             // Receipt attach
@@ -326,38 +333,40 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             _buildExtractedItemsSection(),
             const SizedBox(height: 32),
 
-            // Submit button
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _isSubmitting ? null : _submitExpense,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                  elevation: 2,
-                ),
-                child: _isSubmitting
-                    ? SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            color: Theme.of(context).colorScheme.onPrimary,
-                            strokeWidth: 2.5),
-                      )
-                    : Text(
-                        _isEditing ? 'UPDATE EXPENSE' : 'ADD EXPENSE',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                            letterSpacing: 0.5),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 80), // space for bottom button
           ],
         ),
       ),
+      bottomNavigationBar: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: FilledButton(
+          key: const ValueKey('expense_save'),
+          onPressed: _isSubmitting ? null : _submitExpense,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
+            elevation: 2,
+          ),
+          child: _isSubmitting
+              ? SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      strokeWidth: 2.5),
+                )
+              : Text(
+                  _isEditing ? 'UPDATE EXPENSE' : 'ADD EXPENSE',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      letterSpacing: 0.5),
+                ),
+        ),
+      ),
+    ),
     ),
     );
   }
@@ -529,6 +538,17 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
 
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                'Tap items to include or exclude them',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+
           // Column headers
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -555,11 +575,26 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
 
-          // Item rows
-          ...result.items.map((item) => Container(
+          // Item rows — user can deselect items
+          ...result.items.asMap().entries.map((mapEntry) {
+            final idx = mapEntry.key;
+            final item = mapEntry.value;
+            final isSelected = !_deselectedReceiptItems.contains(idx);
+            return InkWell(
+              onTap: () => setState(() {
+                if (isSelected) {
+                  _deselectedReceiptItems.add(idx);
+                } else {
+                  _deselectedReceiptItems.remove(idx);
+                }
+                // Recalculate amount based on selected items
+                _recalculateReceiptAmount(result);
+              }),
+              child: Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
+                  color: isSelected ? null : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                   border: Border(
                     bottom: BorderSide(
                       color: colorScheme.outlineVariant.withValues(alpha: 0.3),
@@ -569,12 +604,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
                 child: Row(
                   children: [
+                    SizedBox(
+                      width: 24,
+                      child: Icon(
+                        isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                        size: 20,
+                        color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       flex: 5,
                       child: Text(
                         item.name,
                         style: textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w500,
+                          decoration: isSelected ? null : TextDecoration.lineThrough,
+                          color: isSelected ? null : colorScheme.outlineVariant,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -585,7 +631,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       child: Text(
                         '${item.quantity}',
                         style: textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                          color: isSelected ? colorScheme.onSurfaceVariant : colorScheme.outlineVariant,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -596,43 +642,85 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         '$currencySymbol${item.totalPrice.toStringAsFixed(2)}',
                         style: textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
+                          decoration: isSelected ? null : TextDecoration.lineThrough,
+                          color: isSelected ? null : colorScheme.outlineVariant,
                         ),
                         textAlign: TextAlign.right,
                       ),
                     ),
                   ],
                 ),
-              )),
+              ),
+            );
+          }),
 
-          // Totals footer
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-            child: Column(
-              children: [
-                if (result.subtotal != null)
+          // Totals footer — dynamically computed from selected items
+          Builder(builder: (_) {
+            // Compute reviewed subtotal from selected items only
+            double reviewedSubtotal = 0;
+            int selectedCount = 0;
+            for (var i = 0; i < result.items.length; i++) {
+              if (_deselectedReceiptItems.contains(i)) continue;
+              selectedCount++;
+              final item = result.items[i];
+              reviewedSubtotal += item.totalPrice > 0
+                  ? item.totalPrice
+                  : item.unitPrice * item.quantity;
+            }
+            // Proportional tax: if the original receipt had tax, scale it
+            // by the fraction of items kept
+            final bool hasTax = result.tax != null && result.tax! > 0;
+            final double reviewedTax;
+            if (hasTax && result.subtotal != null && result.subtotal! > 0) {
+              reviewedTax = result.tax! * (reviewedSubtotal / result.subtotal!);
+            } else if (hasTax && result.total != null && result.total! > 0) {
+              reviewedTax = result.tax! *
+                  (reviewedSubtotal /
+                      (result.total! - result.tax!).clamp(0.01, double.infinity));
+            } else {
+              reviewedTax = 0;
+            }
+            final double reviewedTotal = reviewedSubtotal + reviewedTax;
+            final bool anyExcluded = _deselectedReceiptItems.isNotEmpty;
+
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              child: Column(
+                children: [
+                  if (anyExcluded)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        '$selectedCount of ${result.items.length} items included',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                   _itemTotalRow(
                       'Subtotal',
-                      '$currencySymbol${result.subtotal!.toStringAsFixed(2)}',
+                      '$currencySymbol${reviewedSubtotal.toStringAsFixed(2)}',
                       colorScheme),
-                if (result.tax != null && result.tax! > 0)
-                  _itemTotalRow(
-                      'Tax',
-                      '$currencySymbol${result.tax!.toStringAsFixed(2)}',
-                      colorScheme),
-                if (result.total != null)
+                  if (hasTax)
+                    _itemTotalRow(
+                        'Tax${anyExcluded ? ' (est.)' : ''}',
+                        '$currencySymbol${reviewedTax.toStringAsFixed(2)}',
+                        colorScheme),
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Total',
+                          anyExcluded ? 'Reviewed Total' : 'Total',
                           style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                         Text(
-                          '$currencySymbol${result.total!.toStringAsFixed(2)}',
+                          '$currencySymbol${reviewedTotal.toStringAsFixed(2)}',
                           style: textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w800,
                             color: colorScheme.primary,
@@ -641,9 +729,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       ],
                     ),
                   ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          }),
         ],
       ),
     );
@@ -685,12 +774,27 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             .withValues(alpha: 0.7),
       );
 
-  Widget _buildClientPicker() {
+  Widget _buildJobPicker() {
+    // Resolve job title/client from provider if we have a jobId but no title yet
+    if (_selectedJobId != null && _selectedJobTitle == null) {
+      final jobs = ref.read(jobListProvider).jobs;
+      final match = jobs.where((j) => j.id == _selectedJobId).firstOrNull;
+      if (match != null) {
+        _selectedJobTitle = match.title;
+        _selectedJobClientName = match.clientName;
+      }
+    }
+
+    final hasSelection = _selectedJobId != null;
+    final displayText = hasSelection
+        ? '${_selectedJobTitle ?? 'Job'}${_selectedJobClientName != null ? ' · ${_selectedJobClientName!}' : ''}'
+        : 'Tap to assign a job';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Link to Client (Optional)',
+          'Assign to Job (Optional)',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -699,21 +803,21 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: _showClientSelector,
+          onTap: _showJobSelector,
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: _selectedCustomerId != null
+                color: hasSelection
                     ? Theme.of(context)
                         .colorScheme
                         .primary
                         .withValues(alpha: 0.4)
                     : Theme.of(context).colorScheme.outlineVariant,
               ),
-              color: _selectedCustomerId != null
+              color: hasSelection
                   ? Theme.of(context)
                       .colorScheme
                       .primaryContainer
@@ -723,10 +827,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             child: Row(
               children: [
                 Icon(
-                  _selectedCustomerId != null
-                      ? Icons.person
-                      : Icons.person_add_alt_1,
-                  color: _selectedCustomerId != null
+                  hasSelection ? Icons.work : Icons.work_outline,
+                  color: hasSelection
                       ? Theme.of(context).colorScheme.primary
                       : Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 20,
@@ -734,23 +836,26 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    _selectedCustomerName ?? 'Tap to link to a client',
+                    displayText,
                     style: TextStyle(
                       fontSize: 15,
-                      color: _selectedCustomerId != null
+                      color: hasSelection
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: _selectedCustomerId != null
+                      fontWeight: hasSelection
                           ? FontWeight.w600
                           : FontWeight.normal,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (_selectedCustomerId != null)
+                if (hasSelection)
                   GestureDetector(
                     onTap: () => setState(() {
-                      _selectedCustomerId = null;
-                      _selectedCustomerName = null;
+                      _selectedJobId = null;
+                      _selectedJobTitle = null;
+                      _selectedJobClientName = null;
                     }),
                     child: Icon(Icons.close,
                         size: 18,
@@ -767,71 +872,116 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
-  Future<void> _showClientSelector() async {
-    final supabase = ref.read(supabaseServiceProvider);
-    final userId = ref.read(userIdProvider);
-    if (userId == null) return;
+  void _showJobSelector() {
+    final jobs = ref.read(jobListProvider).jobs;
 
-    List<Map<String, dynamic>> customers = [];
-    try {
-      await supabase.ensureValidSession();
-      final data = await supabase.client
-          .from('customers')
-          .select()
-          .eq('user_id', userId)
-          .order('name');
-      customers = List<Map<String, dynamic>>.from(data as List);
-    } catch (_) {}
-
-    if (!mounted || customers.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'No clients found. Add a client from Customer Ledger first.')),
-        );
-      }
+    if (jobs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'No jobs found. Create a job first.')),
+      );
       return;
     }
 
-    await showModalBottomSheet(
+    // Sort: active jobs first, then by creation date descending
+    final sorted = List<Job>.from(jobs)
+      ..sort((a, b) {
+        if (a.status.isActive && !b.status.isActive) return -1;
+        if (!a.status.isActive && b.status.isActive) return 1;
+        return b.createdAt.compareTo(a.createdAt);
+      });
+
+    showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Select Client',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            ...customers.map((c) => ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor:
-                        Theme.of(context).colorScheme.primaryContainer,
-                    child: Text(
-                      (c['name'] ?? '?')[0].toUpperCase(),
-                      style: TextStyle(
-                          color:
-                              Theme.of(context).colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.bold),
-                    ),
+      builder: (ctx) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.6,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Select Job',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: sorted.map((job) {
+                      final isSelected = job.id == _selectedJobId;
+                      // Build a meaningful subtitle that does NOT
+                      // repeat the title.  Priority order:
+                      //   1. client name (if different from title)
+                      //   2. trade
+                      //   3. status + type
+                      //   4. nothing (single-line row)
+                      String? subtitle;
+                      if (job.clientName.isNotEmpty &&
+                          job.clientName.toLowerCase().trim() !=
+                              job.title.toLowerCase().trim()) {
+                        subtitle = job.clientName;
+                      } else if (job.trade != null &&
+                          job.trade!.isNotEmpty) {
+                        subtitle = job.trade!;
+                      } else if (job.status.isActive) {
+                        subtitle =
+                            '${job.type.displayName} · ${job.status.displayName}';
+                      }
+
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: isSelected
+                              ? Theme.of(context).colorScheme.primary
+                              : Theme.of(context).colorScheme.primaryContainer,
+                          child: Icon(
+                            Icons.work,
+                            size: 18,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.onPrimary
+                                : Theme.of(context).colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        title: Text(job.title,
+                            style: TextStyle(
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w600)),
+                        subtitle: subtitle != null
+                            ? Text(subtitle,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant))
+                            : null,
+                        trailing: isSelected
+                            ? Icon(Icons.check_circle,
+                                color: Theme.of(context).colorScheme.primary,
+                                size: 20)
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedJobId = job.id;
+                            _selectedJobTitle = job.title;
+                            _selectedJobClientName = job.clientName;
+                          });
+                          Navigator.pop(ctx);
+                        },
+                      );
+                    }).toList(),
                   ),
-                  title: Text(c['name'] ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  onTap: () {
-                    setState(() {
-                      _selectedCustomerId = c['id'];
-                      _selectedCustomerName = c['name'];
-                    });
-                    Navigator.pop(ctx);
-                  },
-                )),
-            const SizedBox(height: 8),
-          ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -942,6 +1092,31 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     return null;
   }
 
+  /// Recalculate the amount field based on which receipt items are selected.
+  /// Includes proportional tax if the original receipt had tax.
+  void _recalculateReceiptAmount(ReceiptAiResult result) {
+    double subtotal = 0;
+    for (var i = 0; i < result.items.length; i++) {
+      if (_deselectedReceiptItems.contains(i)) continue;
+      final item = result.items[i];
+      subtotal += item.totalPrice > 0
+          ? item.totalPrice
+          : item.unitPrice * item.quantity;
+    }
+    // Proportional tax
+    double tax = 0;
+    if (result.tax != null && result.tax! > 0) {
+      if (result.subtotal != null && result.subtotal! > 0) {
+        tax = result.tax! * (subtotal / result.subtotal!);
+      } else if (result.total != null && result.total! > 0) {
+        final origSubtotal =
+            (result.total! - result.tax!).clamp(0.01, double.infinity);
+        tax = result.tax! * (subtotal / origSubtotal);
+      }
+    }
+    _amountController.text = (subtotal + tax).toStringAsFixed(2);
+  }
+
   ExpenseCategory _suggestCategoryFromReceipt(domain_receipt.Receipt receipt) {
     final haystack = [
       receipt.extractedVendor ?? '',
@@ -989,7 +1164,44 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       String? resolvedReceiptPath = _receiptPath;
       String? resolvedReceiptUrl =
           _isEditing ? widget.existingExpense?.receiptUrl : null;
+      // If user deselected receipt items, persist only the included ones
       String? resolvedReceiptOcr = _receiptOcrText;
+      if (_deselectedReceiptItems.isNotEmpty && resolvedReceiptOcr != null) {
+        try {
+          final parsed = ReceiptAiResult.fromJsonString(resolvedReceiptOcr);
+          if (parsed.items.isNotEmpty) {
+            final kept = <ReceiptLineItem>[];
+            for (var i = 0; i < parsed.items.length; i++) {
+              if (!_deselectedReceiptItems.contains(i)) {
+                kept.add(parsed.items[i]);
+              }
+            }
+            // Recalculate subtotal/total for kept items
+            double keptSubtotal = 0;
+            for (final item in kept) {
+              keptSubtotal += item.totalPrice > 0
+                  ? item.totalPrice
+                  : item.unitPrice * item.quantity;
+            }
+            double keptTax = 0;
+            if (parsed.tax != null && parsed.tax! > 0 &&
+                parsed.subtotal != null && parsed.subtotal! > 0) {
+              keptTax = parsed.tax! * (keptSubtotal / parsed.subtotal!);
+            }
+            final filtered = ReceiptAiResult(
+              storeName: parsed.storeName,
+              items: kept,
+              subtotal: keptSubtotal,
+              tax: keptTax > 0 ? keptTax : null,
+              total: keptSubtotal + keptTax,
+              date: parsed.date,
+            );
+            resolvedReceiptOcr = filtered.toJsonString();
+          }
+        } catch (_) {
+          // If parsing fails, keep original
+        }
+      }
 
       if (_linkedReceiptId != null && _linkedReceiptId!.isNotEmpty) {
         final linked = await ref
@@ -1016,15 +1228,33 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             expenseId: expenseId,
             imagePath: resolvedReceiptPath,
           );
-          resolvedReceiptUrl = uploaded ?? resolvedReceiptUrl;
+          if (uploaded != null) {
+            resolvedReceiptUrl = uploaded;
+          } else if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Receipt image could not be uploaded. Expense saved without cloud backup.'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
         }
+      }
+
+      // Derive customerId from selected job if available
+      String? resolvedJobId = _selectedJobId ?? widget.jobId ?? widget.existingExpense?.jobId;
+      String? resolvedCustomerId;
+      if (resolvedJobId != null) {
+        final jobs = ref.read(jobListProvider).jobs;
+        final match = jobs.where((j) => j.id == resolvedJobId).firstOrNull;
+        resolvedCustomerId = match?.customerId;
       }
 
       final expense = Expense(
         id: expenseId,
         userId: userId,
-        jobId: widget.jobId ?? widget.existingExpense?.jobId,
-        customerId: _selectedCustomerId ?? widget.existingExpense?.customerId,
+        jobId: resolvedJobId,
+        customerId: resolvedCustomerId,
         description: _descriptionController.text.trim(),
         vendor: _vendorController.text.trim().isEmpty
             ? null
@@ -1047,6 +1277,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             .read(expenseListProvider.notifier)
             .updateExpense(expense.id, expense);
         if (success && mounted) {
+          ref.invalidate(costBreakdownProvider);
+          ref.invalidate(costLedgerProvider);
+          try {
+            ProviderScope.containerOf(context)
+                .read(analyticsProvider.notifier)
+                .refresh();
+          } catch (e) {
+            debugPrint('Analytics refresh after expense update failed: $e');
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: const Text('Expense updated'),
@@ -1063,6 +1302,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 .read(receiptProvider.notifier)
                 .linkToExpense(_linkedReceiptId!, created.id);
           }
+          ref.invalidate(costBreakdownProvider);
+          ref.invalidate(costLedgerProvider);
+          try {
+            ProviderScope.containerOf(context)
+                .read(analyticsProvider.notifier)
+                .refresh();
+          } catch (e) {
+            debugPrint('Analytics refresh after expense create failed: $e');
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: const Text('Expense added'),
@@ -1071,11 +1319,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           Navigator.of(context).pop(created);
         }
       }
-    } catch (_) {
+    } catch (e) {
       if (mounted) {
+        final msg = e.toString().toLowerCase();
+        final isOffline = msg.contains('socketexception') || msg.contains('network');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Failed to save expense. Please try again.'),
+            content: Text(isOffline
+                ? 'No internet connection. Please check your network and try again.'
+                : 'Failed to save expense. Please try again.'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -1114,7 +1366,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return await supabase.client.storage
           .from('receipts')
           .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Receipt upload/signed URL generation failed: $e');
       return null;
     }
   }

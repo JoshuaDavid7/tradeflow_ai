@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -10,8 +11,9 @@ import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/supabase_service.dart';
 import '../../providers/customer_ledger_provider.dart';
+import 'block_editor/note_block.dart';
 
-/// A single image attached to a note.
+/// A single image attached to a note (kept for backward compat with list screens).
 class NoteImage {
   final String? url;
   final String? storagePath;
@@ -35,7 +37,7 @@ class NoteImage {
   );
 }
 
-/// Full-screen note editor inspired by Apple Notes / Bear.
+/// Full-screen block-based note editor.
 class NoteEditorScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic>? existingNote;
   final String customerId;
@@ -58,16 +60,24 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
 
 class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   late TextEditingController _titleCtrl;
-  late TextEditingController _contentCtrl;
+  late List<NoteBlock> _blocks;
+
+  // Per-block controllers and focus nodes
+  final _controllers = <String, TextEditingController>{};
+  final _focusNodes = <String, FocusNode>{};
 
   String _selectedColor = 'blue';
   bool _pinned = false;
-  List<NoteImage> _images = [];
   bool _isSaving = false;
   bool _hasUnsavedChanges = false;
   Timer? _autoSaveTimer;
   String? _noteId;
-  int _previousContentLength = 0;
+  final _titleFocus = FocusNode();
+  final _scrollController = ScrollController();
+
+  // Track which block index to focus after rebuild
+  int? _pendingFocusIndex;
+  int? _pendingCursorOffset;
 
   bool get _isEditing => widget.existingNote != null;
 
@@ -85,19 +95,18 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     super.initState();
     final note = widget.existingNote;
     _titleCtrl = TextEditingController(text: note?['title']?.toString() ?? '');
-    _contentCtrl = TextEditingController(text: note?['content']?.toString() ?? '');
-    _previousContentLength = _contentCtrl.text.length;
     _selectedColor = note?['color']?.toString() ?? 'blue';
     _pinned = note?['pinned'] == true;
     _noteId = note?['id']?.toString();
 
-    // Parse existing images
-    final rawImages = note?['images'];
-    if (rawImages is List) {
-      _images = rawImages
-          .map((e) => e is Map<String, dynamic> ? NoteImage.fromJson(e) : null)
-          .whereType<NoteImage>()
-          .toList();
+    // Parse content into blocks
+    final content = note?['content']?.toString();
+    final legacyImages = note?['images'];
+    _blocks = parseNoteContent(content, legacyImages is List ? legacyImages : null);
+
+    // Initialize controllers for all text blocks
+    for (final block in _blocks) {
+      _ensureController(block);
     }
   }
 
@@ -105,25 +114,91 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   void dispose() {
     _autoSaveTimer?.cancel();
     _titleCtrl.dispose();
-    _contentCtrl.dispose();
+    _titleFocus.dispose();
+    _scrollController.dispose();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    for (final f in _focusNodes.values) {
+      f.dispose();
+    }
     super.dispose();
   }
 
-  void _markDirty([String? _]) {
-    if (!_hasUnsavedChanges) setState(() => _hasUnsavedChanges = true);
+  TextEditingController _ensureController(NoteBlock block) {
+    return _controllers.putIfAbsent(block.id, () {
+      return TextEditingController(text: block.text);
+    });
+  }
+
+  FocusNode _ensureFocusNode(NoteBlock block) {
+    return _focusNodes.putIfAbsent(block.id, () {
+      final fn = FocusNode();
+      fn.onKeyEvent = (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.backspace) {
+          final ctrl = _controllers[block.id];
+          if (ctrl != null &&
+              ctrl.selection.isValid &&
+              ctrl.selection.baseOffset == 0 &&
+              ctrl.selection.extentOffset == 0) {
+            final idx = _blocks.indexWhere((b) => b.id == block.id);
+            if (idx >= 0) {
+              _onBlockBackspaceAtStart(idx);
+              return KeyEventResult.handled;
+            }
+          }
+        }
+        return KeyEventResult.ignored;
+      };
+      return fn;
+    });
+  }
+
+  void _cleanupBlock(String blockId) {
+    _controllers.remove(blockId)?.dispose();
+    _focusNodes.remove(blockId)?.dispose();
+  }
+
+  // ─── Dirty / autosave ──────────────────────────────────────────────────
+
+  void _markDirty() {
+    if (!_hasUnsavedChanges && mounted) setState(() => _hasUnsavedChanges = true);
     _autoSaveTimer?.cancel();
     _autoSaveTimer = Timer(const Duration(seconds: 3), () {
-      if (_hasUnsavedChanges && (_titleCtrl.text.trim().isNotEmpty || _contentCtrl.text.trim().isNotEmpty)) {
-        _saveNote();
+      if (_hasUnsavedChanges) {
+        final hasContent = _titleCtrl.text.trim().isNotEmpty ||
+            _blocks.any((b) =>
+                (b.isTextBlock && b.text.isNotEmpty) ||
+                b.type == NoteBlockType.image);
+        if (hasContent) _saveNote();
       }
     });
   }
 
-  // ─── Save ────────────────────────────────────────────────────────────────
+  /// Sync all TextEditingControllers back into _blocks.
+  void _syncBlockTexts() {
+    for (int i = 0; i < _blocks.length; i++) {
+      final b = _blocks[i];
+      if (b.isTextBlock) {
+        final ctrl = _controllers[b.id];
+        if (ctrl != null && ctrl.text != b.text) {
+          _blocks[i] = b.copyWith(text: ctrl.text);
+        }
+      }
+    }
+  }
+
+  // ─── Save ──────────────────────────────────────────────────────────────
 
   Future<void> _saveNote({bool silent = true}) async {
-    // Allow saving without title — only skip if completely empty (no title, no content)
-    if (_titleCtrl.text.trim().isEmpty && _contentCtrl.text.trim().isEmpty) return;
+    _syncBlockTexts();
+    final title = _titleCtrl.text.trim();
+    final hasContent = title.isNotEmpty ||
+        _blocks.any((b) =>
+            (b.isTextBlock && b.text.isNotEmpty) ||
+            b.type == NoteBlockType.image);
+    if (!hasContent) return;
     if (_isSaving) return;
 
     setState(() => _isSaving = true);
@@ -142,22 +217,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       await _uploadPendingImages(supabase, userId);
 
       final now = DateTime.now().toIso8601String();
-      final imagesJson = _images
-          .where((i) => !i.isLocal)
-          .map((i) => i.toJson())
+
+      // Build legacy images array for backward compat with list screens
+      final legacyImages = _blocks
+          .where((b) => b.type == NoteBlockType.image && b.url != null)
+          .map((b) => {
+                'url': b.url,
+                'path': b.storagePath,
+                'created_at': now,
+              })
           .toList();
 
       final noteData = <String, dynamic>{
         'user_id': userId,
-        'title': _titleCtrl.text.trim(),
-        'content': _contentCtrl.text.trim(),
+        'title': title,
+        'content': blocksToJson(_blocks),
         'color': _selectedColor,
         'pinned': _pinned,
         'updated_at': now,
-        'images': imagesJson,
+        'images': legacyImages,
       };
 
-      // Add customer/project links
       if (widget.customerId.isNotEmpty) {
         noteData['customer_id'] = widget.customerId;
       }
@@ -166,14 +246,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       }
 
       if (_noteId != null) {
-        // Update existing
         try {
           await supabase.client
               .from('project_notes')
               .update(noteData)
               .eq('id', _noteId!);
-        } catch (_) {
-          // Fallback: remove columns that may not exist
+        } catch (e) {
+          debugPrint('Note update failed, retrying without optional columns: $e');
           noteData.remove('customer_id');
           noteData.remove('project_id');
           noteData.remove('images');
@@ -183,13 +262,13 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               .eq('id', _noteId!);
         }
       } else {
-        // Insert new
         _noteId = const Uuid().v4();
         noteData['id'] = _noteId;
         noteData['created_at'] = now;
         try {
           await supabase.client.from('project_notes').insert(noteData);
-        } catch (_) {
+        } catch (e) {
+          debugPrint('Note insert failed, retrying without optional columns: $e');
           noteData.remove('customer_id');
           noteData.remove('project_id');
           noteData.remove('images');
@@ -221,8 +300,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
       if (mounted) {
         setState(() => _isSaving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Could not save note. Please try again.'),
+          const SnackBar(
+            content: Text('Could not save note. Please try again.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -230,51 +309,17 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
   }
 
-  // ─── Images ──────────────────────────────────────────────────────────────
+  // ─── Image upload ─────────────────────────────────────────────────────
 
-  Future<void> _pickImages(ImageSource source) async {
-    try {
-      if (source == ImageSource.gallery) {
-        final images = await ImagePicker().pickMultiImage(
-          maxWidth: 1920,
-          imageQuality: 85,
-        );
-        for (final img in images) {
-          _images.add(NoteImage(
-            localPath: img.path,
-            createdAt: DateTime.now().toIso8601String(),
-          ));
-        }
-      } else {
-        final image = await ImagePicker().pickImage(
-          source: ImageSource.camera,
-          maxWidth: 1920,
-          imageQuality: 85,
-        );
-        if (image != null) {
-          _images.add(NoteImage(
-            localPath: image.path,
-            createdAt: DateTime.now().toIso8601String(),
-          ));
-        }
-      }
-      setState(() {});
-      _markDirty();
-    } catch (e) {
-      debugPrint('Image pick error: $e');
-    }
-  }
+  Future<void> _uploadPendingImages(SupabaseService supabase, String userId) async {
+    for (int i = 0; i < _blocks.length; i++) {
+      final block = _blocks[i];
+      if (!block.isLocalImage) continue;
 
-  Future<void> _uploadPendingImages(
-      SupabaseService supabase, String userId) async {
-    for (int i = 0; i < _images.length; i++) {
-      final img = _images[i];
-      if (!img.isLocal) continue;
-
-      final file = File(img.localPath!);
+      final file = File(block.localPath!);
       if (!await file.exists()) continue;
 
-      final ext = _normalizedExt(img.localPath!);
+      final ext = _normalizedExt(block.localPath!);
       final imageId = const Uuid().v4();
       final noteId = _noteId ?? const Uuid().v4();
       if (_noteId == null) _noteId = noteId;
@@ -292,10 +337,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
             .from('notes')
             .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
 
-        _images[i] = NoteImage(
+        _blocks[i] = block.copyWith(
           url: signedUrl,
           storagePath: storagePath,
-          createdAt: img.createdAt,
+          localPath: null,
         );
       } catch (e) {
         debugPrint('Image upload failed: $e');
@@ -303,8 +348,216 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     }
   }
 
-  void _removeImage(int index) {
-    final img = _images[index];
+  // ─── Block operations ─────────────────────────────────────────────────
+
+  void _insertBlockAfter(int index, NoteBlock newBlock) {
+    setState(() {
+      _blocks.insert(index + 1, newBlock);
+      if (newBlock.isTextBlock) {
+        _ensureController(newBlock);
+      }
+      _pendingFocusIndex = index + 1;
+      _pendingCursorOffset = 0;
+    });
+    _markDirty();
+  }
+
+  void _removeBlock(int index) {
+    if (_blocks.length <= 1 && _blocks[index].isTextBlock) {
+      // Don't remove the last text block — just clear it
+      final block = _blocks[index];
+      _controllers[block.id]?.clear();
+      _blocks[index] = block.copyWith(text: '', type: NoteBlockType.paragraph);
+      setState(() {});
+      _markDirty();
+      return;
+    }
+
+    final removed = _blocks.removeAt(index);
+    _cleanupBlock(removed.id);
+    setState(() {});
+    _markDirty();
+  }
+
+  void _updateBlock(int index, NoteBlock updated) {
+    _blocks[index] = updated;
+    _markDirty();
+    setState(() {});
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final block = _blocks.removeAt(oldIndex);
+      _blocks.insert(newIndex, block);
+      _renumberBlocks();
+    });
+    _markDirty();
+  }
+
+  void _renumberBlocks() {
+    int num = 1;
+    for (int i = 0; i < _blocks.length; i++) {
+      if (_blocks[i].type == NoteBlockType.numbered) {
+        _blocks[i] = _blocks[i].copyWith(number: num++);
+      } else {
+        num = 1;
+      }
+    }
+  }
+
+  /// Handle Enter key in a text block.
+  void _onBlockEnter(int index) {
+    _syncBlockTexts();
+    final block = _blocks[index];
+    final ctrl = _controllers[block.id];
+    if (ctrl == null) return;
+
+    final text = ctrl.text;
+    final cursorPos = ctrl.selection.baseOffset.clamp(0, text.length);
+
+    // If empty list block, convert to paragraph (exit list mode)
+    if (block.isListBlock && text.trim().isEmpty) {
+      _blocks[index] = NoteBlock(
+        id: block.id,
+        type: NoteBlockType.paragraph,
+        text: '',
+      );
+      ctrl.text = '';
+      setState(() {});
+      _markDirty();
+      return;
+    }
+
+    // Split text at cursor
+    final before = text.substring(0, cursorPos);
+    final after = text.substring(cursorPos);
+
+    // Update current block with text before cursor
+    ctrl.text = before;
+    ctrl.selection = TextSelection.collapsed(offset: before.length);
+    _blocks[index] = block.copyWith(text: before);
+
+    // Create new block with text after cursor, same type
+    NoteBlock newBlock;
+    if (block.type == NoteBlockType.checklist) {
+      newBlock = NoteBlock.checklist(after, false);
+    } else if (block.type == NoteBlockType.bullet) {
+      newBlock = NoteBlock.bullet(after);
+    } else if (block.type == NoteBlockType.numbered) {
+      newBlock = NoteBlock.numbered(after, block.number + 1);
+    } else {
+      newBlock = NoteBlock.paragraph(after);
+    }
+
+    _ensureController(newBlock).text = after;
+    _insertBlockAfter(index, newBlock);
+    _renumberBlocks();
+  }
+
+  /// Handle Backspace at position 0 in a text block.
+  void _onBlockBackspaceAtStart(int index) {
+    _syncBlockTexts();
+    final block = _blocks[index];
+
+    // If it's a list/heading block, convert to paragraph first
+    if (block.type != NoteBlockType.paragraph) {
+      _blocks[index] = block.copyWith(type: NoteBlockType.paragraph);
+      setState(() {});
+      _markDirty();
+      return;
+    }
+
+    // Merge with previous text block
+    if (index == 0) return;
+
+    // Find previous text block
+    int prevIndex = index - 1;
+    while (prevIndex >= 0 && !_blocks[prevIndex].isTextBlock) {
+      prevIndex--;
+    }
+    if (prevIndex < 0) return;
+
+    final prevBlock = _blocks[prevIndex];
+    final prevCtrl = _controllers[prevBlock.id];
+    final currentCtrl = _controllers[block.id];
+    if (prevCtrl == null || currentCtrl == null) return;
+
+    final mergePoint = prevCtrl.text.length;
+    final mergedText = prevCtrl.text + currentCtrl.text;
+
+    prevCtrl.text = mergedText;
+    _blocks[prevIndex] = prevBlock.copyWith(text: mergedText);
+
+    // Remove current block
+    _blocks.removeAt(index);
+    _cleanupBlock(block.id);
+
+    setState(() {
+      _pendingFocusIndex = prevIndex;
+      _pendingCursorOffset = mergePoint;
+    });
+    _markDirty();
+  }
+
+  /// Insert image(s) at the current focus position.
+  Future<void> _pickImages(ImageSource source) async {
+    try {
+      // Find focused block index
+      int insertAfter = _blocks.length - 1;
+      for (int i = 0; i < _blocks.length; i++) {
+        final fn = _focusNodes[_blocks[i].id];
+        if (fn != null && fn.hasFocus) {
+          insertAfter = i;
+          break;
+        }
+      }
+
+      List<String> paths = [];
+      if (source == ImageSource.gallery) {
+        final images = await ImagePicker().pickMultiImage(
+          maxWidth: 1920,
+          imageQuality: 85,
+        );
+        paths = images.map((i) => i.path).toList();
+      } else {
+        final image = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          maxWidth: 1920,
+          imageQuality: 85,
+        );
+        if (image != null) paths.add(image.path);
+      }
+
+      if (paths.isEmpty) return;
+
+      setState(() {
+        for (int i = 0; i < paths.length; i++) {
+          final imgBlock = NoteBlock.image(localPath: paths[i]);
+          _blocks.insert(insertAfter + 1 + i, imgBlock);
+        }
+        // Add empty paragraph after last image if needed
+        final lastInserted = insertAfter + paths.length;
+        if (lastInserted >= _blocks.length - 1 ||
+            !_blocks[lastInserted + 1].isTextBlock) {
+          final para = NoteBlock.paragraph();
+          _blocks.insert(lastInserted + 1, para);
+          _ensureController(para);
+          _pendingFocusIndex = lastInserted + 1;
+          _pendingCursorOffset = 0;
+        } else {
+          _pendingFocusIndex = lastInserted + 1;
+          _pendingCursorOffset = 0;
+        }
+      });
+      _markDirty();
+    } catch (e) {
+      debugPrint('Image pick error: $e');
+    }
+  }
+
+  void _removeImageBlock(int index) {
+    final block = _blocks[index];
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -318,18 +571,18 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              // Delete from storage if uploaded
-              if (img.storagePath != null) {
+              if (block.storagePath != null) {
                 try {
                   final supabase = ref.read(supabaseServiceProvider);
                   await supabase.deleteFile(
                     bucket: 'notes',
-                    paths: [img.storagePath!],
+                    paths: [block.storagePath!],
                   );
-                } catch (_) {}
+                } catch (e) {
+                  debugPrint('Storage delete failed: $e');
+                }
               }
-              setState(() => _images.removeAt(index));
-              _markDirty();
+              _removeBlock(index);
             },
             child: const Text('Remove', style: TextStyle(color: Colors.red)),
           ),
@@ -338,7 +591,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  void _viewImage(NoteImage img) {
+  void _viewImage(NoteBlock block) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -351,9 +604,9 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
           ),
           body: Center(
             child: InteractiveViewer(
-              child: img.isLocal
-                  ? Image.file(File(img.localPath!), fit: BoxFit.contain)
-                  : Image.network(img.url!, fit: BoxFit.contain,
+              child: block.localPath != null
+                  ? Image.file(File(block.localPath!), fit: BoxFit.contain)
+                  : Image.network(block.url!, fit: BoxFit.contain,
                       errorBuilder: (_, __, ___) => const Icon(
                         Icons.broken_image,
                         color: Colors.white54,
@@ -367,7 +620,58 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  // ─── Delete ──────────────────────────────────────────────────────────────
+  // ─── Toolbar actions ──────────────────────────────────────────────────
+
+  void _insertBlockType(NoteBlockType type) {
+    _syncBlockTexts();
+
+    // Find focused block
+    int focusedIndex = _blocks.length - 1;
+    for (int i = 0; i < _blocks.length; i++) {
+      final fn = _focusNodes[_blocks[i].id];
+      if (fn != null && fn.hasFocus) {
+        focusedIndex = i;
+        break;
+      }
+    }
+
+    final current = _blocks[focusedIndex];
+
+    // If current block is empty text, convert it instead of inserting new
+    if (current.isTextBlock) {
+      final ctrl = _controllers[current.id];
+      if (ctrl != null && ctrl.text.trim().isEmpty) {
+        // Toggle: if already this type, revert to paragraph
+        final newType = current.type == type ? NoteBlockType.paragraph : type;
+        _blocks[focusedIndex] = current.copyWith(type: newType);
+        setState(() {});
+        _markDirty();
+        return;
+      }
+    }
+
+    // Insert new block after focused
+    NoteBlock newBlock;
+    switch (type) {
+      case NoteBlockType.checklist:
+        newBlock = NoteBlock.checklist();
+      case NoteBlockType.bullet:
+        newBlock = NoteBlock.bullet();
+      case NoteBlockType.numbered:
+        newBlock = NoteBlock.numbered();
+      case NoteBlockType.heading:
+        newBlock = NoteBlock.heading();
+      case NoteBlockType.divider:
+        newBlock = NoteBlock.divider();
+      default:
+        newBlock = NoteBlock.paragraph();
+    }
+    _ensureController(newBlock);
+    _insertBlockAfter(focusedIndex, newBlock);
+    _renumberBlocks();
+  }
+
+  // ─── Delete note ──────────────────────────────────────────────────────
 
   void _deleteNote() {
     showDialog(
@@ -391,15 +695,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                 final supabase = ref.read(supabaseServiceProvider);
                 await supabase.ensureValidSession();
 
-                // Delete images from storage
-                final paths = _images
-                    .where((i) => i.storagePath != null)
-                    .map((i) => i.storagePath!)
+                final paths = _blocks
+                    .where((b) => b.storagePath != null)
+                    .map((b) => b.storagePath!)
                     .toList();
                 if (paths.isNotEmpty) {
                   try {
                     await supabase.deleteFile(bucket: 'notes', paths: paths);
-                  } catch (_) {}
+                  } catch (e) {
+                    debugPrint('Storage cleanup failed: $e');
+                  }
                 }
 
                 await supabase.client
@@ -424,7 +729,10 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Could not delete note. Please try again.'), backgroundColor: Colors.red),
+                    const SnackBar(
+                      content: Text('Could not delete note.'),
+                      backgroundColor: Colors.red,
+                    ),
                   );
                 }
               }
@@ -436,11 +744,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  // ─── Back guard ──────────────────────────────────────────────────────────
+  // ─── Back guard ────────────────────────────────────────────────────────
 
   Future<bool> _onWillPop() async {
+    _syncBlockTexts();
     if (!_hasUnsavedChanges) return true;
-    if (_titleCtrl.text.trim().isEmpty && _contentCtrl.text.trim().isEmpty) return true;
+    final hasContent = _titleCtrl.text.trim().isNotEmpty ||
+        _blocks.any((b) =>
+            (b.isTextBlock && b.text.isNotEmpty) ||
+            b.type == NoteBlockType.image);
+    if (!hasContent) return true;
 
     final result = await showDialog<String>(
       context: context,
@@ -459,14 +772,11 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         ],
       ),
     );
-
-    if (result == 'save') {
-      await _saveNote(silent: false);
-    }
+    if (result == 'save') await _saveNote(silent: false);
     return true;
   }
 
-  // ─── Helpers ─────────────────────────────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────────────────────
 
   String _normalizedExt(String path) {
     final segs = path.split('.');
@@ -477,191 +787,16 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   String _contentType(String ext) {
     switch (ext) {
-      case 'png':
-        return 'image/png';
-      case 'heic':
-        return 'image/heic';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'image/jpeg';
+      case 'png': return 'image/png';
+      case 'heic': return 'image/heic';
+      case 'webp': return 'image/webp';
+      default: return 'image/jpeg';
     }
   }
 
   Color _colorForName(String? name) => _colors[name] ?? AppColors.noteBlue;
 
-  // ─── List formatting ────────────────────────────────────────────────────
-
-  static const _checkboxUnchecked = '☐ ';
-  static const _checkboxChecked = '☑ ';
-  static const _bulletPrefix = '• ';
-
-  /// Insert a checklist line at the cursor.
-  void _insertChecklist() {
-    _insertListPrefix(_checkboxUnchecked);
-  }
-
-  /// Insert a bullet line at the cursor.
-  void _insertBullet() {
-    _insertListPrefix(_bulletPrefix);
-  }
-
-  void _insertListPrefix(String prefix) {
-    final text = _contentCtrl.text;
-    final sel = _contentCtrl.selection;
-    final offset = sel.isValid ? sel.baseOffset : text.length;
-
-    // Find the start of the current line
-    int lineStart = offset;
-    while (lineStart > 0 && text[lineStart - 1] != '\n') {
-      lineStart--;
-    }
-    final lineEnd = text.indexOf('\n', offset);
-    final currentLine = text.substring(
-      lineStart,
-      lineEnd == -1 ? text.length : lineEnd,
-    );
-
-    // If the line already has this prefix, remove it (toggle off)
-    if (currentLine.startsWith(prefix)) {
-      _contentCtrl.text = text.replaceRange(lineStart, lineStart + prefix.length, '');
-      _contentCtrl.selection = TextSelection.collapsed(
-        offset: (offset - prefix.length).clamp(0, _contentCtrl.text.length),
-      );
-      _previousContentLength = _contentCtrl.text.length;
-      _markDirty();
-      return;
-    }
-
-    // If the line already has a different list prefix, replace it
-    for (final p in [_checkboxUnchecked, _checkboxChecked, _bulletPrefix]) {
-      if (currentLine.startsWith(p)) {
-        _contentCtrl.text = text.replaceRange(lineStart, lineStart + p.length, prefix);
-        _contentCtrl.selection = TextSelection.collapsed(
-          offset: (offset - p.length + prefix.length).clamp(0, _contentCtrl.text.length),
-        );
-        _previousContentLength = _contentCtrl.text.length;
-        _markDirty();
-        return;
-      }
-    }
-
-    // Insert prefix at line start
-    _contentCtrl.text = text.replaceRange(lineStart, lineStart, prefix);
-    _contentCtrl.selection = TextSelection.collapsed(
-      offset: offset + prefix.length,
-    );
-    _previousContentLength = _contentCtrl.text.length;
-    _markDirty();
-  }
-
-  /// Handle Enter key to continue list formatting.
-  void _onContentChanged(String newText) {
-    final prevLen = _previousContentLength;
-    _previousContentLength = newText.length;
-    _markDirty();
-
-    // Check if exactly one character was inserted (likely a newline from Enter)
-    if (newText.length == prevLen + 1) {
-      final sel = _contentCtrl.selection;
-      if (!sel.isValid) return;
-      final offset = sel.baseOffset;
-      if (offset > 0 && newText[offset - 1] == '\n') {
-        // Find the previous line
-        int prevLineStart = offset - 2;
-        while (prevLineStart >= 0 && newText[prevLineStart] != '\n') {
-          prevLineStart--;
-        }
-        prevLineStart++;
-        final prevLine = newText.substring(prevLineStart, offset - 1);
-
-        // Continue checkbox/bullet if previous line had one
-        String? continuationPrefix;
-        if (prevLine.startsWith(_checkboxUnchecked)) {
-          // If the previous line was ONLY the prefix (empty item), remove it
-          if (prevLine.trim() == _checkboxUnchecked.trim()) {
-            _contentCtrl.text = newText.replaceRange(prevLineStart, offset, '');
-            _contentCtrl.selection = TextSelection.collapsed(
-              offset: prevLineStart,
-            );
-            _previousContentLength = _contentCtrl.text.length;
-            return;
-          }
-          continuationPrefix = _checkboxUnchecked;
-        } else if (prevLine.startsWith(_checkboxChecked)) {
-          if (prevLine.trim() == _checkboxChecked.trim()) {
-            _contentCtrl.text = newText.replaceRange(prevLineStart, offset, '');
-            _contentCtrl.selection = TextSelection.collapsed(
-              offset: prevLineStart,
-            );
-            _previousContentLength = _contentCtrl.text.length;
-            return;
-          }
-          continuationPrefix = _checkboxUnchecked; // new items start unchecked
-        } else if (prevLine.startsWith(_bulletPrefix)) {
-          if (prevLine.trim() == _bulletPrefix.trim()) {
-            _contentCtrl.text = newText.replaceRange(prevLineStart, offset, '');
-            _contentCtrl.selection = TextSelection.collapsed(
-              offset: prevLineStart,
-            );
-            _previousContentLength = _contentCtrl.text.length;
-            return;
-          }
-          continuationPrefix = _bulletPrefix;
-        }
-
-        if (continuationPrefix != null) {
-          _contentCtrl.text = newText.replaceRange(
-            offset, offset, continuationPrefix,
-          );
-          _contentCtrl.selection = TextSelection.collapsed(
-            offset: offset + continuationPrefix.length,
-          );
-          _previousContentLength = _contentCtrl.text.length;
-        }
-      }
-    }
-  }
-
-  /// Toggle checkbox state when a checkbox line is tapped.
-  void _toggleCheckboxAtCursor() {
-    final text = _contentCtrl.text;
-    final sel = _contentCtrl.selection;
-    if (!sel.isValid) return;
-
-    final offset = sel.baseOffset;
-    int lineStart = offset;
-    while (lineStart > 0 && text[lineStart - 1] != '\n') {
-      lineStart--;
-    }
-    final lineEnd = text.indexOf('\n', lineStart);
-    final currentLine = text.substring(
-      lineStart,
-      lineEnd == -1 ? text.length : lineEnd,
-    );
-
-    if (currentLine.startsWith(_checkboxUnchecked)) {
-      _contentCtrl.text = text.replaceRange(
-        lineStart,
-        lineStart + _checkboxUnchecked.length,
-        _checkboxChecked,
-      );
-      _contentCtrl.selection = TextSelection.collapsed(offset: offset);
-      _previousContentLength = _contentCtrl.text.length;
-      _markDirty();
-    } else if (currentLine.startsWith(_checkboxChecked)) {
-      _contentCtrl.text = text.replaceRange(
-        lineStart,
-        lineStart + _checkboxChecked.length,
-        _checkboxUnchecked,
-      );
-      _contentCtrl.selection = TextSelection.collapsed(offset: offset);
-      _previousContentLength = _contentCtrl.text.length;
-      _markDirty();
-    }
-  }
-
-  // ─── Build ───────────────────────────────────────────────────────────────
+  // ─── Build ─────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -670,6 +805,27 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     final updatedAt = widget.existingNote?['updated_at'] != null
         ? DateTime.tryParse(widget.existingNote!['updated_at'].toString())
         : null;
+
+    // Handle pending focus requests
+    if (_pendingFocusIndex != null) {
+      final idx = _pendingFocusIndex!;
+      final cursorOffset = _pendingCursorOffset ?? 0;
+      _pendingFocusIndex = null;
+      _pendingCursorOffset = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (idx < _blocks.length) {
+          final block = _blocks[idx];
+          final fn = _focusNodes[block.id];
+          final ctrl = _controllers[block.id];
+          fn?.requestFocus();
+          if (ctrl != null) {
+            ctrl.selection = TextSelection.collapsed(
+              offset: cursorOffset.clamp(0, ctrl.text.length),
+            );
+          }
+        }
+      });
+    }
 
     return PopScope(
       canPop: false,
@@ -682,102 +838,143 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         backgroundColor: colorScheme.surface,
         appBar: AppBar(
           elevation: 0,
-          scrolledUnderElevation: 0.5,
+          scrolledUnderElevation: 0,
           backgroundColor: colorScheme.surface,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, size: 22),
+            icon: const Icon(Icons.chevron_left_rounded, size: 28),
             onPressed: () async {
               final shouldPop = await _onWillPop();
               if (shouldPop && context.mounted) Navigator.pop(context);
             },
           ),
-          title: _buildContextChip(),
           titleSpacing: 0,
+          title: _buildSaveStatus(colorScheme),
           actions: [
-            // Pin toggle
-            IconButton(
-              icon: Icon(
-                _pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                color: _pinned ? color : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                size: 20,
-              ),
-              tooltip: _pinned ? 'Unpin' : 'Pin to top',
-              onPressed: () {
-                setState(() => _pinned = !_pinned);
-                _markDirty();
+            // More actions menu (pin, color, divider, delete)
+            PopupMenuButton<String>(
+              icon: Icon(Icons.more_horiz_rounded, size: 22,
+                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
+              padding: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              onSelected: (value) {
+                switch (value) {
+                  case 'pin':
+                    setState(() => _pinned = !_pinned);
+                    _markDirty();
+                  case 'divider':
+                    _insertBlockType(NoteBlockType.divider);
+                  case 'delete':
+                    _deleteNote();
+                }
               },
+              itemBuilder: (ctx) => [
+                PopupMenuItem(
+                  value: 'pin',
+                  child: Row(children: [
+                    Icon(_pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                        size: 18, color: _pinned ? colorScheme.primary : null),
+                    const SizedBox(width: 10),
+                    Text(_pinned ? 'Unpin note' : 'Pin note'),
+                  ]),
+                ),
+                PopupMenuItem(
+                  value: 'divider',
+                  child: Row(children: [
+                    Icon(Icons.horizontal_rule_rounded, size: 18,
+                        color: colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 10),
+                    const Text('Insert divider'),
+                  ]),
+                ),
+                if (_isEditing) ...[
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(children: [
+                      const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      const SizedBox(width: 10),
+                      const Text('Delete note', style: TextStyle(color: Colors.red)),
+                    ]),
+                  ),
+                ],
+              ],
             ),
-            // Save button
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: _isSaving
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 20, height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : TextButton(
-                      onPressed: () => _saveNote(silent: false),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                      child: Text(_hasUnsavedChanges ? 'Save' : 'Done'),
-                    ),
+              padding: const EdgeInsets.only(right: 4),
+              child: TextButton(
+                onPressed: _isSaving ? null : () async {
+                  _syncBlockTexts();
+                  await _saveNote(silent: false);
+                  if (context.mounted) Navigator.pop(context);
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                ),
+                child: const Text('Done'),
+              ),
             ),
           ],
         ),
         body: Column(
           children: [
-            // Thin color accent — subtle note identity
-            Container(
-              height: 2,
-              color: color.withValues(alpha: 0.35),
-            ),
-
-            // Main editor — continuous writing canvas
+            // Editor body — clean document canvas
             Expanded(
               child: GestureDetector(
-                onTap: () => FocusScope.of(context).unfocus(),
+                onTap: () {
+                  if (_blocks.isEmpty || !_blocks.last.isTextBlock) {
+                    final para = NoteBlock.paragraph();
+                    _ensureController(para);
+                    setState(() {
+                      _blocks.add(para);
+                      _pendingFocusIndex = _blocks.length - 1;
+                    });
+                  } else {
+                    final lastBlock = _blocks.last;
+                    _ensureFocusNode(lastBlock).requestFocus();
+                  }
+                },
                 behavior: HitTestBehavior.translucent,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Date — minimal, left-aligned
+                      // Date — quiet, editorial
                       if (updatedAt != null)
                         Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 14),
                           child: Text(
-                            DateFormat('MMM d, y \u2022 h:mm a').format(updatedAt),
+                            DateFormat('EEEE, MMM d, y \u2022 h:mm a').format(updatedAt),
                             style: TextStyle(
-                              fontSize: 11,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                              letterSpacing: 0.3,
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                              letterSpacing: 0.1,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                         ),
 
-                      // Title — clean heading, no box
+                      // Title — large, bold, borderless
                       TextField(
+                        key: const ValueKey('note_title_field'),
                         controller: _titleCtrl,
+                        focusNode: _titleFocus,
                         style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          height: 1.3,
-                          letterSpacing: -0.3,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                          letterSpacing: -0.6,
                           color: colorScheme.onSurface,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Untitled',
+                          hintText: 'Title',
                           hintStyle: TextStyle(
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-                            fontWeight: FontWeight.w500,
-                            fontSize: 20,
-                            letterSpacing: -0.3,
+                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.32),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 28,
+                            letterSpacing: -0.6,
                           ),
                           filled: false,
                           border: InputBorder.none,
@@ -787,316 +984,527 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
                           isDense: true,
                         ),
                         textCapitalization: TextCapitalization.sentences,
-                        onChanged: _markDirty,
+                        textInputAction: TextInputAction.next,
+                        onChanged: (_) => _markDirty(),
+                        onSubmitted: (_) {
+                          if (_blocks.isNotEmpty && _blocks.first.isTextBlock) {
+                            _ensureFocusNode(_blocks.first).requestFocus();
+                          }
+                        },
                       ),
 
-                      // Subtle divider between title and body
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        child: Divider(
-                          height: 1,
-                          thickness: 0.5,
-                          color: colorScheme.outlineVariant.withValues(alpha: 0.15),
-                        ),
+                      // Breathing space after title
+                      const SizedBox(height: 16),
+
+                      // Block list — seamless, no visual borders
+                      ReorderableListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        buildDefaultDragHandles: false,
+                        proxyDecorator: (child, index, animation) {
+                          return Material(
+                            elevation: 4,
+                            shadowColor: Colors.black26,
+                            borderRadius: BorderRadius.circular(8),
+                            color: colorScheme.surface,
+                            child: child,
+                          );
+                        },
+                        onReorder: _onReorder,
+                        itemCount: _blocks.length,
+                        itemBuilder: (context, index) {
+                          final block = _blocks[index];
+                          return _buildBlockWidget(
+                            key: ValueKey(block.id),
+                            block: block,
+                            index: index,
+                            colorScheme: colorScheme,
+                          );
+                        },
                       ),
 
-                      // Body — open writing surface, no box
-                      TextField(
-                        controller: _contentCtrl,
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          height: 1.65,
-                          color: colorScheme.onSurface.withValues(alpha: 0.85),
-                          letterSpacing: -0.1,
+                      // Generous tap zone at end
+                      GestureDetector(
+                        onTap: () {
+                          if (_blocks.isEmpty || !_blocks.last.isTextBlock) {
+                            final para = NoteBlock.paragraph();
+                            _ensureController(para);
+                            setState(() {
+                              _blocks.add(para);
+                              _pendingFocusIndex = _blocks.length - 1;
+                            });
+                          } else {
+                            _ensureFocusNode(_blocks.last).requestFocus();
+                          }
+                        },
+                        child: Container(
+                          height: 280,
+                          color: Colors.transparent,
                         ),
-                        decoration: InputDecoration(
-                          hintText: 'Start writing\u2026',
-                          hintStyle: TextStyle(
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-                            height: 1.65,
-                          ),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                          isDense: true,
-                        ),
-                        maxLines: null,
-                        minLines: 12,
-                        textCapitalization: TextCapitalization.sentences,
-                        keyboardType: TextInputType.multiline,
-                        onChanged: _onContentChanged,
                       ),
-
-                      const SizedBox(height: 24),
-
-                      // Images grid
-                      if (_images.isNotEmpty) _buildImageGrid(),
-
-                      const SizedBox(height: 80),
                     ],
                   ),
                 ),
               ),
             ),
 
-            // Bottom toolbar — attachments, colors, status
-            _buildBottomToolbar(color, updatedAt),
+            // Compact toolbar
+            _buildToolbar(),
           ],
         ),
       ),
     );
   }
 
-  // ─── Widgets ─────────────────────────────────────────────────────────────
+  // ─── Save status indicator (in app bar) ────────────────────────────────
+
+  Widget _buildSaveStatus(ColorScheme colorScheme) {
+    if (_isSaving) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 12, height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text('Saving…',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                fontWeight: FontWeight.w400,
+              )),
+        ],
+      );
+    }
+    if (!_hasUnsavedChanges && _noteId != null) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_done_outlined, size: 14,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+          const SizedBox(width: 5),
+          Text('Saved',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                fontWeight: FontWeight.w400,
+              )),
+        ],
+      );
+    }
+    // Show context chip when not showing save status
+    return _buildContextChip();
+  }
+
+  // ─── Block widget builder ──────────────────────────────────────────────
+
+  Widget _buildBlockWidget({
+    required Key key,
+    required NoteBlock block,
+    required int index,
+    required ColorScheme colorScheme,
+  }) {
+    switch (block.type) {
+      case NoteBlockType.image:
+        return _buildImageBlock(key: key, block: block, index: index, colorScheme: colorScheme);
+      case NoteBlockType.divider:
+        return _buildDividerBlock(key: key, block: block, index: index, colorScheme: colorScheme);
+      default:
+        return _buildTextBlock(key: key, block: block, index: index, colorScheme: colorScheme);
+    }
+  }
+
+  Widget _buildTextBlock({
+    required Key key,
+    required NoteBlock block,
+    required int index,
+    required ColorScheme colorScheme,
+  }) {
+    final ctrl = _ensureController(block);
+    final focusNode = _ensureFocusNode(block);
+
+    // Document-native text styles
+    TextStyle textStyle;
+    switch (block.type) {
+      case NoteBlockType.heading:
+        textStyle = TextStyle(
+          fontSize: 19,
+          fontWeight: FontWeight.w700,
+          height: 1.35,
+          letterSpacing: -0.3,
+          color: colorScheme.onSurface,
+        );
+      default:
+        textStyle = TextStyle(
+          fontSize: 16,
+          height: 1.55,
+          color: colorScheme.onSurface.withValues(alpha: 0.85),
+          letterSpacing: -0.15,
+        );
+    }
+
+    // Quiet hint text
+    String hintText;
+    switch (block.type) {
+      case NoteBlockType.heading:
+        hintText = 'Heading';
+      case NoteBlockType.checklist:
+        hintText = 'To-do';
+      case NoteBlockType.bullet:
+      case NoteBlockType.numbered:
+        hintText = 'List item';
+      default:
+        hintText = '';
+    }
+
+    // Leading widgets — elegant, not heavy
+    Widget? leading;
+    double leadingIndent = 0;
+    switch (block.type) {
+      case NoteBlockType.checklist:
+        leadingIndent = 0;
+        leading = GestureDetector(
+          onTap: () {
+            _blocks[index] = block.copyWith(checked: !block.checked);
+            setState(() {});
+            _markDirty();
+          },
+          child: Padding(
+            padding: const EdgeInsets.only(right: 10, top: 1),
+            child: SizedBox(
+              width: 22, height: 22,
+              child: block.checked
+                  ? Icon(Icons.check_circle_rounded, size: 20,
+                      color: colorScheme.primary.withValues(alpha: 0.7))
+                  : Icon(Icons.radio_button_unchecked_rounded, size: 20,
+                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+            ),
+          ),
+        );
+      case NoteBlockType.bullet:
+        leadingIndent = 4;
+        leading = Padding(
+          padding: const EdgeInsets.only(right: 10, top: 10),
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      case NoteBlockType.numbered:
+        leadingIndent = 0;
+        leading = Padding(
+          padding: const EdgeInsets.only(right: 8, top: 1),
+          child: SizedBox(
+            width: 22,
+            child: Text(
+              '${block.number}.',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+                height: 1.55,
+              ),
+            ),
+          ),
+        );
+      default:
+        break;
+    }
+
+    final textField = TextField(
+      key: ValueKey('block_text_${block.id}'),
+      controller: ctrl,
+      focusNode: focusNode,
+      style: block.type == NoteBlockType.checklist && block.checked
+          ? textStyle.copyWith(
+              decoration: TextDecoration.lineThrough,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+            )
+          : textStyle,
+      decoration: InputDecoration(
+        hintText: hintText,
+        hintStyle: TextStyle(
+          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.18),
+          height: textStyle.height,
+          fontSize: textStyle.fontSize,
+        ),
+        filled: false,
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        contentPadding: EdgeInsets.zero,
+        isDense: true,
+      ),
+      maxLines: null,
+      textCapitalization: TextCapitalization.sentences,
+      keyboardType: TextInputType.multiline,
+      inputFormatters: [
+        _BlockTextInputFormatter(
+          onEnter: () => _onBlockEnter(index),
+          onBackspaceAtStart: () => _onBlockBackspaceAtStart(index),
+        ),
+      ],
+      onChanged: (text) {
+        _blocks[index] = block.copyWith(text: text);
+        _markDirty();
+      },
+    );
+
+    // Clean layout: optional leading + text, with invisible drag surface
+    return ReorderableDragStartListener(
+      key: key,
+      index: index,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: leading != null ? leadingIndent : 0,
+          bottom: block.type == NoteBlockType.heading ? 4 : 0,
+          top: block.type == NoteBlockType.heading && index > 0 ? 8 : 0,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (leading != null) leading,
+            Expanded(child: textField),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageBlock({
+    required Key key,
+    required NoteBlock block,
+    required int index,
+    required ColorScheme colorScheme,
+  }) {
+    final isLocal = block.localPath != null;
+    final imageWidget = ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: isLocal
+          ? Image.file(
+              File(block.localPath!),
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 220,
+            )
+          : Image.network(
+              block.url!,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: 220,
+              errorBuilder: (_, __, ___) => Container(
+                height: 220,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Icon(Icons.broken_image_rounded,
+                      color: colorScheme.outlineVariant, size: 32),
+                ),
+              ),
+            ),
+    );
+
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: GestureDetector(
+        onTap: () => _viewImage(block),
+        child: Stack(
+          children: [
+            imageWidget,
+            // Subtle gradient at top for controls
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.black.withValues(alpha: 0.3), Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+            // Drag handle — subtle, top-left
+            Positioned(
+              top: 8,
+              left: 8,
+              child: ReorderableDragStartListener(
+                index: index,
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.open_with_rounded,
+                      color: Colors.white70, size: 14),
+                ),
+              ),
+            ),
+            // Upload indicator
+            if (isLocal)
+              Positioned(
+                top: 8,
+                right: 42,
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5, color: Colors.white70,
+                    ),
+                  ),
+                ),
+              ),
+            // Remove — subtle X
+            Positioned(
+              top: 8,
+              right: 8,
+              child: GestureDetector(
+                onTap: () => _removeImageBlock(index),
+                child: Container(
+                  padding: const EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: Colors.white70, size: 14),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDividerBlock({
+    required Key key,
+    required NoteBlock block,
+    required int index,
+    required ColorScheme colorScheme,
+  }) {
+    return GestureDetector(
+      key: key,
+      onDoubleTap: () => _removeBlock(index),
+      child: ReorderableDragStartListener(
+        index: index,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Center(
+            child: Container(
+              width: 40,
+              height: 1,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.25),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Context chip ──────────────────────────────────────────────────────
 
   Widget _buildContextChip() {
     final parts = <String>[];
-    if (widget.customerName.isNotEmpty) parts.add(widget.customerName);
+    if (widget.customerName.isNotEmpty && widget.customerName != 'General') {
+      parts.add(widget.customerName);
+    }
     if (widget.projectName != null && widget.projectName!.isNotEmpty) {
       parts.add(widget.projectName!);
     }
     if (parts.isEmpty) return const SizedBox.shrink();
 
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.person_outline_rounded, size: 13,
-              color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: 4),
-          Flexible(
-            child: Text(
-              parts.join(' \u203a '),
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildImageGrid() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Icon(Icons.photo_library_outlined,
-                size: 16, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(width: 6),
-            Text(
-              '${_images.length} photo${_images.length == 1 ? '' : 's'}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+        Icon(Icons.person_outline_rounded, size: 13,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55)),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            parts.join(' \u203a '),
+            style: TextStyle(
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
+              fontWeight: FontWeight.w400,
             ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          height: 100,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: _images.length,
-            itemBuilder: (context, index) {
-              final img = _images[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: GestureDetector(
-                  onTap: () => _viewImage(img),
-                  onLongPress: () => _removeImage(index),
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: SizedBox(
-                          width: 100,
-                          height: 100,
-                          child: img.isLocal
-                              ? Image.file(File(img.localPath!),
-                                  fit: BoxFit.cover)
-                              : Image.network(img.url!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => Container(
-                                    color: Theme.of(context).colorScheme.surfaceContainerLow,
-                                    child: Icon(Icons.broken_image,
-                                        color: Theme.of(context).colorScheme.outlineVariant),
-                                  ),
-                                ),
-                        ),
-                      ),
-                      // Upload indicator for local images
-                      if (img.isLocal)
-                        Positioned(
-                          top: 4,
-                          right: 4,
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.cloud_upload_outlined,
-                                color: Colors.white, size: 14),
-                          ),
-                        ),
-                      // Remove button
-                      Positioned(
-                        top: 4,
-                        left: 4,
-                        child: GestureDetector(
-                          onTap: () => _removeImage(index),
-                          child: Container(
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.close,
-                                color: Colors.white, size: 14),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
         ),
-        const SizedBox(height: 16),
       ],
     );
   }
 
-  Widget _buildBottomToolbar(Color activeColor, DateTime? updatedAt) {
+  // ─── Bottom toolbar — focused and clean ────────────────────────────────
+
+  Widget _buildToolbar() {
     final colorScheme = Theme.of(context).colorScheme;
+    final iconColor = colorScheme.onSurfaceVariant.withValues(alpha: 0.7);
+
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(top: BorderSide(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.2),
-        )),
+        border: Border(
+          top: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.1),
+          ),
+        ),
       ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // List formatting buttons
-              _toolbarIcon(Icons.checklist_rounded, 'Checklist',
-                  _insertChecklist),
-              _toolbarIcon(Icons.format_list_bulleted_rounded, 'Bullet list',
-                  _insertBullet),
-              _toolbarIcon(Icons.check_box_outlined, 'Toggle checkbox',
-                  _toggleCheckboxAtCursor),
+              // Formatting tools
+              _toolbarBtn(Icons.checklist_rounded, 'Checklist',
+                  () => _insertBlockType(NoteBlockType.checklist), iconColor),
+              const SizedBox(width: 4),
+              _toolbarBtn(Icons.format_list_bulleted_rounded, 'Bullets',
+                  () => _insertBlockType(NoteBlockType.bullet), iconColor),
+              const SizedBox(width: 4),
+              _toolbarBtn(Icons.format_list_numbered_rounded, 'Numbered',
+                  () => _insertBlockType(NoteBlockType.numbered), iconColor),
+              const SizedBox(width: 4),
+              _toolbarBtn(Icons.title_rounded, 'Heading',
+                  () => _insertBlockType(NoteBlockType.heading), iconColor),
 
-              // Divider
+              // Separator
               Container(
                 width: 1, height: 20,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+                color: colorScheme.outlineVariant.withValues(alpha: 0.12),
               ),
 
-              // Attachment buttons
-              _toolbarIcon(Icons.camera_alt_outlined, 'Camera',
-                  () => _pickImages(ImageSource.camera)),
-              _toolbarIcon(Icons.photo_outlined, 'Gallery',
-                  () => _pickImages(ImageSource.gallery)),
-
-              // Divider
-              Container(
-                width: 1, height: 20,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                color: colorScheme.outlineVariant.withValues(alpha: 0.3),
-              ),
-
-              // Color dots — compact
-              ..._colors.entries.map((e) {
-                final isSelected = e.key == _selectedColor;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => _selectedColor = e.key);
-                    _markDirty();
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: isSelected ? 20 : 16,
-                      height: isSelected ? 20 : 16,
-                      decoration: BoxDecoration(
-                        color: e.value,
-                        shape: BoxShape.circle,
-                        border: isSelected
-                            ? Border.all(
-                                color: colorScheme.onSurface, width: 2)
-                            : Border.all(
-                                color: e.value.withValues(alpha: 0.4), width: 1),
-                      ),
-                    ),
-                  ),
-                );
-              }),
-
-              const Spacer(),
-
-              // Save status
-              if (_isSaving)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      width: 12, height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: colorScheme.outlineVariant,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text('Saving\u2026',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
-                        )),
-                  ],
-                )
-              else if (!_hasUnsavedChanges && _noteId != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.cloud_done_outlined, size: 14,
-                        color: AppColors.paid(context)),
-                    const SizedBox(width: 4),
-                    Text('Saved',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.paid(context),
-                        )),
-                  ],
-                ),
-
-              // Delete — far right, muted (edit only)
-              if (_isEditing)
-                _toolbarIcon(Icons.delete_outline, 'Delete', _deleteNote,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+              // Media
+              _toolbarBtn(Icons.camera_alt_rounded, 'Camera',
+                  () => _pickImages(ImageSource.camera), iconColor),
+              const SizedBox(width: 4),
+              _toolbarBtn(Icons.photo_library_rounded, 'Photos',
+                  () => _pickImages(ImageSource.gallery), iconColor),
             ],
           ),
         ),
@@ -1104,16 +1512,61 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
     );
   }
 
-  Widget _toolbarIcon(IconData icon, String tooltip, VoidCallback onTap,
-      {Color? color}) {
+  Widget _toolbarBtn(IconData icon, String tooltip, VoidCallback onTap, Color color) {
     return IconButton(
-      icon: Icon(icon, size: 20,
-          color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
+      icon: Icon(icon, size: 22, color: color),
       tooltip: tooltip,
       onPressed: onTap,
-      visualDensity: VisualDensity.compact,
-      padding: const EdgeInsets.all(8),
-      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      padding: const EdgeInsets.all(10),
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      splashRadius: 22,
     );
+  }
+}
+
+// ─── Custom TextInputFormatter for Enter/Backspace interception ──────────
+
+class _BlockTextInputFormatter extends TextInputFormatter {
+  final VoidCallback onEnter;
+  final VoidCallback onBackspaceAtStart;
+
+  _BlockTextInputFormatter({
+    required this.onEnter,
+    required this.onBackspaceAtStart,
+  });
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Detect Enter key (newline inserted)
+    if (newValue.text.length == oldValue.text.length + 1) {
+      final insertedChar = newValue.text.length > 0 &&
+              newValue.selection.baseOffset > 0
+          ? newValue.text[newValue.selection.baseOffset - 1]
+          : null;
+      if (insertedChar == '\n') {
+        // Block the newline, handle via block split
+        WidgetsBinding.instance.addPostFrameCallback((_) => onEnter());
+        return oldValue; // Reject the newline
+      }
+    }
+
+    // Detect Backspace at position 0
+    if (newValue.text.length == oldValue.text.length - 1 &&
+        oldValue.selection.baseOffset == 0 &&
+        oldValue.selection.extentOffset == 0 &&
+        newValue.selection.baseOffset == 0) {
+      // This pattern doesn't quite work because backspace at 0 doesn't change text.
+      // We need a different approach.
+    }
+
+    // Detect backspace at start: old cursor was at 0, text didn't change (nothing to delete)
+    // Actually: if selection was at 0 with no selection, and we get a composing change that
+    // results in same text, it means backspace was pressed at position 0.
+    // This is handled via RawKeyboardListener instead.
+
+    return newValue;
   }
 }

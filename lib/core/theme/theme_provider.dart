@@ -27,8 +27,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
         default:
           state = ThemeMode.system;
       }
-    } catch (_) {
-      // Keep default ThemeMode.system if SharedPreferences fails
+    } catch (e) {
+      debugPrint('Theme load from SharedPreferences failed: $e');
     }
   }
 
@@ -47,8 +47,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
           await prefs.setString(_kThemeModeKey, 'system');
           break;
       }
-    } catch (_) {
-      // Persist failure is non-critical — theme is already applied in memory
+    } catch (e) {
+      debugPrint('Theme save to SharedPreferences failed (non-critical): $e');
     }
   }
 }

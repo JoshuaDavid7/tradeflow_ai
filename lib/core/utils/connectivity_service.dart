@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../errors/error_handler.dart';
 
@@ -76,8 +77,9 @@ class ConnectivityService {
       _updateConnectivityStatus(ConnectivityStatus.offline);
     } on TimeoutException catch (_) {
       _updateConnectivityStatus(ConnectivityStatus.offline);
-    } catch (_) {
+    } catch (e) {
       // Any other error – assume online to avoid blocking app functionality.
+      debugPrint('Connectivity check error (assuming online): $e');
       _updateConnectivityStatus(ConnectivityStatus.online);
     }
   }

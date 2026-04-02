@@ -260,13 +260,35 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
   }
 
-  void _confirmDeleteCustomer(Customer c) {
+  void _confirmDeleteCustomer(Customer c) async {
     Navigator.pop(context); // Close detail sheet first
+
+    // Check for linked jobs before deleting
+    int linkedJobCount = 0;
+    try {
+      final jobs = await _supabase
+          .from('jobs')
+          .select('id')
+          .eq('customer_id', c.id);
+      linkedJobCount = (jobs as List).length;
+    } catch (_) {
+      // If check fails, proceed with basic warning
+    }
+
+    if (!mounted) return;
+
+    final warningText = linkedJobCount > 0
+        ? 'This will delete "${c.name}" and unlink $linkedJobCount '
+            '${linkedJobCount == 1 ? 'job' : 'jobs'}. '
+            'The jobs themselves will not be deleted but will lose their client link. '
+            'This cannot be undone.'
+        : 'Are you sure you want to delete "${c.name}"? This cannot be undone.';
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Customer'),
-        content: Text('Are you sure you want to delete "${c.name}"? This cannot be undone.'),
+        content: Text(warningText),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),

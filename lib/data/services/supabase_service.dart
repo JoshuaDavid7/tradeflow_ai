@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart'
     hide AuthException, StorageException;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:convert';
 import '../../core/config/env_config.dart';
@@ -64,7 +65,8 @@ class SupabaseService {
       final decoded = utf8.decode(base64Url.decode(normalized));
       final dynamic json = jsonDecode(decoded);
       return json is Map<String, dynamic> ? json : null;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('JWT segment decode error: $e');
       return null;
     }
   }
@@ -316,18 +318,30 @@ class SupabaseService {
     String contentType = 'application/octet-stream',
   }) async {
     try {
-      await _client.storage.from(bucket).upload(
-            path,
-            file,
-            fileOptions: FileOptions(
-              contentType: contentType,
-              upsert: true,
-            ),
-          );
+      final storage = _client.storage.from(bucket);
+      final fileOptions = FileOptions(
+        contentType: contentType,
+        upsert: true,
+      );
+
+      if (file is Uint8List) {
+        await storage.uploadBinary(
+          path,
+          file,
+          fileOptions: fileOptions,
+        );
+      } else {
+        await storage.upload(
+          path,
+          file,
+          fileOptions: fileOptions,
+        );
+      }
 
       ErrorHandler.debug('File upload successful', {
         'bucket': bucket,
         'path': path,
+        'isBinary': file is Uint8List,
       });
 
       return path;
@@ -405,11 +419,13 @@ class SupabaseService {
         );
       }
 
-      final response = await _client.functions.invoke(
-        functionName,
-        body: body,
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final response = await _client.functions
+          .invoke(
+            functionName,
+            body: body,
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(const Duration(seconds: 35));
 
       if (response.status != 200) {
         throw Exception(
@@ -460,7 +476,8 @@ class SupabaseService {
 
       ErrorHandler.handle(error, stackTrace);
       throw NetworkException(
-        message: 'Failed to invoke function: $functionName',
+        message:
+            'Function $functionName failed (${error.status}): ${error.details ?? error.reasonPhrase ?? error}',
         originalError: error,
         stackTrace: stackTrace,
       );
@@ -469,7 +486,7 @@ class SupabaseService {
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);
       throw NetworkException(
-        message: 'Failed to invoke function: $functionName',
+        message: 'Function $functionName error: $error',
         originalError: error,
         stackTrace: stackTrace,
       );

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/config/env_config.dart';
 import '../../core/errors/error_handler.dart';
@@ -86,7 +87,8 @@ class ReceiptAiResult {
     try {
       final map = jsonDecode(jsonStr) as Map<String, dynamic>;
       return ReceiptAiResult.fromJson(map);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ReceiptAiResult.fromJsonString parse error: $e');
       return const ReceiptAiResult();
     }
   }

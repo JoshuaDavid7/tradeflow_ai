@@ -251,11 +251,13 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
 
     try {
       await supabase.ensureValidSession();
+      // Filter by project_id so only notes for THIS project appear
       final data = await supabase.client
           .from('project_notes')
           .select()
           .eq('user_id', userId)
           .eq('customer_id', _customerId)
+          .eq('project_id', _projectId)
           .order('updated_at', ascending: false);
       final notes = List<Map<String, dynamic>>.from(data as List);
       // Sort pinned notes first
@@ -269,16 +271,10 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
       });
       return notes;
     } catch (e) {
-      try {
-        final data = await supabase.client
-            .from('project_notes')
-            .select()
-            .eq('user_id', userId)
-            .order('updated_at', ascending: false);
-        return List<Map<String, dynamic>>.from(data as List);
-      } catch (_) {
-        return [];
-      }
+      // project_id or customer_id column may not exist — return empty
+      // rather than leaking unrelated notes.
+      debugPrint('Project notes fetch failed (column may not exist): $e');
+      return [];
     }
   }
 
@@ -422,7 +418,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           .map((e) => e is Map ? e['url']?.toString() : null)
           .whereType<String>()
           .toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Image URL extraction failed: $e');
       return [];
     }
   }
@@ -485,7 +482,9 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
           .from('project_notes')
           .update({'pinned': newPinned}).eq('id', note['id']);
       setState(() {});
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Note pin toggle failed: $e');
+    }
   }
 
   void _confirmDeleteNote(Map<String, dynamic> note) {
@@ -523,7 +522,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Could not delete project. Please try again.'),
+                        content: Text('Could not delete note. Please try again.'),
                         backgroundColor: Colors.red),
                   );
                 }

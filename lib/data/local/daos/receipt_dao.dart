@@ -23,6 +23,10 @@ class ReceiptDao extends DatabaseAccessor<AppDatabase> with _$ReceiptDaoMixin {
         ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
       .get();
 
+  Future<Receipt?> getReceiptByExpenseId(String expenseId) =>
+      (select(receipts)..where((t) => t.expenseId.equals(expenseId)))
+          .getSingleOrNull();
+
   Future<List<Receipt>> getUnlinkedReceipts(String userId) =>
       (select(receipts)
         ..where((t) =>

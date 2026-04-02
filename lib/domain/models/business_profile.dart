@@ -11,6 +11,13 @@ class BusinessProfile {
   final String currencySymbol;
   final bool isPro;
 
+  // Document defaults
+  final String invoicePrefix;
+  final String quotePrefix;
+  final int nextInvoiceNumber;
+  final int defaultDueDays;
+  final double defaultMarkupPercent;
+
   const BusinessProfile({
     required this.id,
     required this.businessName,
@@ -22,6 +29,11 @@ class BusinessProfile {
     this.defaultTaxRate = 0.0,
     this.currencySymbol = '\$',
     this.isPro = false,
+    this.invoicePrefix = 'INV',
+    this.quotePrefix = 'QUO',
+    this.nextInvoiceNumber = 1,
+    this.defaultDueDays = 14,
+    this.defaultMarkupPercent = 0.0,
   });
 
   factory BusinessProfile.fromJson(Map<String, dynamic> json) {
@@ -41,6 +53,11 @@ class BusinessProfile {
       defaultTaxRate: taxRate,
       currencySymbol: json['currency_symbol'] as String? ?? '\$',
       isPro: json['is_pro'] as bool? ?? false,
+      invoicePrefix: json['invoice_prefix'] as String? ?? 'INV',
+      quotePrefix: json['quote_prefix'] as String? ?? 'QUO',
+      nextInvoiceNumber: (json['next_invoice_number'] as num?)?.toInt() ?? 1,
+      defaultDueDays: (json['default_due_days'] as num?)?.toInt() ?? 14,
+      defaultMarkupPercent: (json['default_markup_percent'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -56,6 +73,11 @@ class BusinessProfile {
       'default_tax_rate': defaultTaxRate,
       'currency_symbol': currencySymbol,
       'is_pro': isPro,
+      'invoice_prefix': invoicePrefix,
+      'quote_prefix': quotePrefix,
+      'next_invoice_number': nextInvoiceNumber,
+      'default_due_days': defaultDueDays,
+      'default_markup_percent': defaultMarkupPercent,
     };
   }
 
@@ -70,6 +92,11 @@ class BusinessProfile {
     double? defaultTaxRate,
     String? currencySymbol,
     bool? isPro,
+    String? invoicePrefix,
+    String? quotePrefix,
+    int? nextInvoiceNumber,
+    int? defaultDueDays,
+    double? defaultMarkupPercent,
   }) {
     return BusinessProfile(
       id: id ?? this.id,
@@ -82,6 +109,11 @@ class BusinessProfile {
       defaultTaxRate: defaultTaxRate ?? this.defaultTaxRate,
       currencySymbol: currencySymbol ?? this.currencySymbol,
       isPro: isPro ?? this.isPro,
+      invoicePrefix: invoicePrefix ?? this.invoicePrefix,
+      quotePrefix: quotePrefix ?? this.quotePrefix,
+      nextInvoiceNumber: nextInvoiceNumber ?? this.nextInvoiceNumber,
+      defaultDueDays: defaultDueDays ?? this.defaultDueDays,
+      defaultMarkupPercent: defaultMarkupPercent ?? this.defaultMarkupPercent,
     );
   }
 }

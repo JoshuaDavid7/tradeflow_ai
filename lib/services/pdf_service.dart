@@ -74,12 +74,12 @@ class PdfService {
     final invoiceNumber = jobData['invoice_number']?.toString() ??
         jobData['invoiceNumber']?.toString();
     final prefix = isQuote ? 'QTE' : 'INV';
-    final numberPart =
-        (invoiceNumber != null && invoiceNumber.isNotEmpty)
-            ? invoiceNumber
-            : prefix;
-    final fileName =
-        '${numberPart}_$fileClient.pdf'.replaceAll(RegExp(r'[^\w.\-]'), '_').toLowerCase();
+    final numberPart = (invoiceNumber != null && invoiceNumber.isNotEmpty)
+        ? invoiceNumber
+        : prefix;
+    final fileName = '${numberPart}_$fileClient.pdf'
+        .replaceAll(RegExp(r'[^\w.\-]'), '_')
+        .toLowerCase();
 
     // ── Share / Print ─────────────────────────────────────────────────────
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
@@ -114,8 +114,10 @@ class PdfService {
     // ── Dates ───────────────────────────────────────────────────────────────
     final now = DateTime.now();
     final dateStr = DateFormat('MMMM d, yyyy').format(now);
-    final dueDateStr =
-        DateFormat('MMMM d, yyyy').format(now.add(const Duration(days: 14)));
+    final dueDays = (jobData['default_due_days'] as int?) ?? 14;
+    final dueDateStr = dueDays == 0
+        ? 'Due on receipt'
+        : DateFormat('MMMM d, yyyy').format(now.add(Duration(days: dueDays)));
 
     // ── Document type ───────────────────────────────────────────────────────
     final rawType =
@@ -148,6 +150,7 @@ class PdfService {
             (jobData['clientAddress'] ?? jobData['client_address'] ?? '')
                 .toString())
         .trim();
+    final clientAddressLines = _formatAddressLines(clientAddress);
     final clientPhone = _pdfSafeText(
             (jobData['clientPhone'] ?? jobData['client_phone'] ?? '')
                 .toString())
@@ -169,11 +172,10 @@ class PdfService {
             (jobData['laborHours'] ?? jobData['labor_hours'] ?? '0')
                 .toString()) ??
         0.0;
-    final hourlyRate = double.tryParse(
-            (jobData['hourlyRateAtTime'] ??
-                    jobData['hourly_rate_at_time'] ??
-                    profile.hourlyRate)
-                .toString()) ??
+    final hourlyRate = double.tryParse((jobData['hourlyRateAtTime'] ??
+                jobData['hourly_rate_at_time'] ??
+                profile.hourlyRate)
+            .toString()) ??
         profile.hourlyRate;
     final laborTotal = laborHours * hourlyRate;
 
@@ -239,7 +241,10 @@ class PdfService {
       ));
     }
     for (final m in materials) {
-      final cost = double.tryParse(m['cost']?.toString() ?? '0') ?? 0.0;
+      final totalCost = double.tryParse(m['cost']?.toString() ?? '0') ?? 0.0;
+      final qty = (m['quantity'] as num?)?.toInt() ?? 1;
+      final unitPrice = (m['unitPrice'] as num?)?.toDouble() ??
+          (qty > 0 ? totalCost / qty : totalCost);
       final itemName = (m['item']?.toString().trim().isNotEmpty ?? false)
           ? _pdfSafeText(m['item'].toString()).trim()
           : (m['name']?.toString().trim().isNotEmpty ?? false)
@@ -247,10 +252,10 @@ class PdfService {
               : 'Material';
       lineItems.add(_LineItem(
         desc: itemName,
-        qty: 1,
-        qtyDisplay: '1',
-        rate: cost,
-        amount: cost,
+        qty: qty.toDouble(),
+        qtyDisplay: _formatQty(qty.toDouble()),
+        rate: unitPrice,
+        amount: totalCost,
       ));
     }
 
@@ -356,8 +361,8 @@ class PdfService {
             pw.SizedBox(height: _space2),
             pw.Container(
               width: double.infinity,
-              padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: pw.BoxDecoration(
                 color: const PdfColor.fromInt(0xFFFEF2F2),
                 border: pw.Border.all(
@@ -378,7 +383,7 @@ class PdfService {
           pw.SizedBox(height: _space4),
           _buildBillToRow(
             clientName: safeClientName,
-            clientAddress: clientAddress,
+            clientAddressLines: clientAddressLines,
             clientPhone: clientPhone,
             clientEmail: clientEmail,
             dueDate: dueDateStr,
@@ -860,7 +865,9 @@ class PdfService {
       if (enabled && trimmed.isNotEmpty) lines.add(trimmed);
     }
 
-    addIf(tmpl.showBusinessAddress, profile.businessAddress);
+    if (tmpl.showBusinessAddress) {
+      lines.addAll(_formatAddressLines(profile.businessAddress ?? ''));
+    }
     addIf(tmpl.showBusinessPhone, profile.businessPhone);
     addIf(tmpl.showBusinessEmail, profile.businessEmail);
 
@@ -945,7 +952,7 @@ class PdfService {
 
   static pw.Widget _buildBillToRow({
     required String clientName,
-    required String clientAddress,
+    required List<String> clientAddressLines,
     required String clientPhone,
     required String clientEmail,
     required String dueDate,
@@ -955,7 +962,7 @@ class PdfService {
     required PdfColor userAccent,
   }) {
     final clientDetailLines = <String>[
-      if (clientAddress.isNotEmpty) clientAddress,
+      ...clientAddressLines,
       if (clientPhone.isNotEmpty) clientPhone,
       if (clientEmail.isNotEmpty) clientEmail,
     ];
@@ -1677,6 +1684,33 @@ class PdfService {
     return const [];
   }
 
+  static List<String> _formatAddressLines(String value) {
+    final cleaned = _pdfSafeText(value).trim();
+    if (cleaned.isEmpty) return const [];
+
+    final explicitLines = cleaned
+        .split(RegExp(r'\r?\n'))
+        .map((part) => _pdfSafeText(part).trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (explicitLines.length > 1) {
+      return explicitLines;
+    }
+
+    final commaParts = cleaned
+        .split(',')
+        .map((part) => _pdfSafeText(part).trim())
+        .where((part) => part.isNotEmpty)
+        .toList();
+
+    if (commaParts.length <= 1) {
+      return cleaned.isEmpty ? const [] : [cleaned];
+    }
+
+    // Each comma-separated part gets its own line
+    return commaParts;
+  }
+
   static String _pdfSafePaymentUrl(String url) {
     final trimmed = url.trim();
     if (trimmed.isEmpty) return '';
@@ -1752,7 +1786,8 @@ class PdfService {
             boldItalic: await PdfGoogleFonts.openSansBoldItalic(),
           );
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Google Fonts theme load failed, using legacy: $e');
       return _legacyThemeForFont(fontFamily);
     }
   }
