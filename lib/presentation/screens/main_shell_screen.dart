@@ -76,7 +76,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       floatingActionButton: _AiAssistantFab(
         onResult: (result) => _handleAiAction(context, result),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
 
       bottomNavigationBar: NavigationBar(
         selectedIndex: selectedIndex,
@@ -279,18 +279,14 @@ class _AiAssistantFab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return SizedBox(
-      width: 56,
-      height: 56,
-      child: FloatingActionButton(
-        key: const ValueKey('ai_assistant_fab'),
-        heroTag: 'ai_assistant',
-        elevation: 4,
-        backgroundColor: colorScheme.primary,
-        shape: const CircleBorder(),
-        onPressed: () => _openAssistant(context, ref),
-        child: const Icon(Icons.mic_rounded, color: Colors.white, size: 26),
-      ),
+    return FloatingActionButton.small(
+      key: const ValueKey('ai_assistant_fab'),
+      heroTag: 'ai_assistant',
+      elevation: 2,
+      backgroundColor: colorScheme.primary,
+      shape: const CircleBorder(),
+      onPressed: () => _openAssistant(context, ref),
+      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
     );
   }
 
