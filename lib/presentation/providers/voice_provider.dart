@@ -34,10 +34,11 @@ class VoiceCaptureNotifier extends StateNotifier<VoiceCaptureProgress> {
     }
   }
 
-  /// Stop and process recording
-  Future<VoiceCaptureResult?> stopAndProcess() async {
+  /// Stop and process recording.
+  /// Pass [invoiceContext] when refining an existing invoice.
+  Future<VoiceCaptureResult?> stopAndProcess({Map<String, dynamic>? invoiceContext}) async {
     try {
-      final result = await _service.stopAndProcess();
+      final result = await _service.stopAndProcess(invoiceContext: invoiceContext);
       return result;
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);

@@ -22,12 +22,14 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
   final String? jobId;
   final Expense? existingExpense; // For editing
   final domain_receipt.Receipt? prefilledReceipt;
+  final Map<String, dynamic>? initialData; // Pre-fill from AI voice command
 
   const AddExpenseScreen({
     super.key,
     this.jobId,
     this.existingExpense,
     this.prefilledReceipt,
+    this.initialData,
   });
 
   @override
@@ -72,6 +74,20 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _selectedJobId = e.jobId ?? widget.jobId;
     } else if (widget.prefilledReceipt != null) {
       _applyScannedReceipt(widget.prefilledReceipt!, shouldNotify: false);
+    } else if (widget.initialData != null) {
+      final d = widget.initialData!;
+      _descriptionController.text = d['description']?.toString() ?? '';
+      final amt = d['amount'];
+      if (amt != null) {
+        _amountController.text = (amt is num) ? amt.toStringAsFixed(2) : amt.toString();
+      }
+      _vendorController.text = d['vendor']?.toString() ?? '';
+      final cat = d['category']?.toString() ?? '';
+      _selectedCategory = ExpenseCategory.values.firstWhere(
+        (e) => e.name == cat,
+        orElse: () => ExpenseCategory.materials,
+      );
+      if (d['taxDeductible'] == true) _taxDeductible = true;
     }
   }
 

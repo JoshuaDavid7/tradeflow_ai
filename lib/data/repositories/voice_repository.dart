@@ -9,7 +9,7 @@ import '../../core/errors/error_handler.dart';
 abstract class IVoiceRepository {
   Future<String> uploadAudio(File file);
   Future<String> transcribeAudio(String storagePath);
-  Future<Map<String, dynamic>> extractJobData(String transcript);
+  Future<Map<String, dynamic>> extractJobData(String transcript, {Map<String, dynamic>? currentState});
 }
 
 /// Voice repository implementation
@@ -117,11 +117,15 @@ class VoiceRepository implements IVoiceRepository {
   }
 
   @override
-  Future<Map<String, dynamic>> extractJobData(String transcript) async {
+  Future<Map<String, dynamic>> extractJobData(String transcript, {Map<String, dynamic>? currentState}) async {
     try {
+      final body = <String, dynamic>{'transcript': transcript};
+      if (currentState != null) {
+        body['currentState'] = currentState;
+      }
       final response = await _supabase.invokeFunction(
         functionName: 'process_job',
-        body: {'transcript': transcript},
+        body: body,
       );
 
       // If response is wrapped in 'result' key

@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.stripe_webhook]
 verify_jwt = false
+
+[functions.process_voice_command]
+verify_jwt = false

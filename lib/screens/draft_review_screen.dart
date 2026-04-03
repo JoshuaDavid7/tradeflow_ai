@@ -2860,18 +2860,51 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     );
   }
 
+  /// Build a snapshot of the current invoice state to send to the AI.
+  Map<String, dynamic> _buildInvoiceContext() {
+    final materials = (_editableData['materials'] as List?) ?? [];
+    return {
+      'clientName': _clientCtrl.text.trim(),
+      'clientAddress': _clientAddressCtrl.text.trim(),
+      'clientPhone': _clientPhoneCtrl.text.trim(),
+      'clientEmail': _clientEmailCtrl.text.trim(),
+      'type': _editableData['type'] ?? 'invoice',
+      'description': _descCtrl.text.trim(),
+      'laborHours': double.tryParse(_laborHoursCtrl.text) ?? 1.0,
+      'laborType': _editableData['laborType'] ?? 'profile',
+      'laborRate': _editableData['laborRate'],
+      'laborAmount': _editableData['laborAmount'],
+      'markupPercent': _markupPercent,
+      'materials': materials.map((m) {
+        if (m is Map) {
+          return {
+            'item': m['item'] ?? '',
+            'quantity': m['quantity'] ?? 1,
+            'unitPrice': m['unitPrice'] ?? 0,
+            'cost': m['cost'] ?? 0,
+            'fromReceipt': m['fromReceipt'] == true,
+          };
+        }
+        return m;
+      }).toList(),
+    };
+  }
+
   Future<void> _voiceRefine() async {
-    // Use voice capture to get additional details and merge into current data
     try {
       final container = ProviderScope.containerOf(context);
       final notifier = container.read(voiceCaptureProvider.notifier);
+      final invoiceContext = _buildInvoiceContext();
 
-      // Show a full-screen voice recording overlay
+      // Show full-screen voice recording overlay, passing current state
       final result = await Navigator.of(context).push<VoiceCaptureResult>(
         PageRouteBuilder(
           opaque: false,
           pageBuilder: (context, animation, secondaryAnimation) =>
-              _VoiceRefineSheet(notifier: notifier),
+              _VoiceRefineSheet(
+            notifier: notifier,
+            invoiceContext: invoiceContext,
+          ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
           },
@@ -2882,121 +2915,119 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 
       if (result == null || !mounted) return;
 
-      // Merge the new voice data into the existing editable data
       final newData = result.extractedData;
+
+      // In refine mode, the AI returns the COMPLETE desired state.
+      // We apply it wholesale, preserving internal metadata (UUIDs, receipt links).
       setState(() {
-        // Merge description
-        final newDesc = (newData['description'] ?? '').toString().trim();
-        if (newDesc.isNotEmpty) {
-          final existing = _descCtrl.text.trim();
-          _descCtrl.text = existing.isEmpty ? newDesc : '$existing\n$newDesc';
+        // ── Simple fields — direct replacement ──
+        final newClient = (newData['clientName'] ?? '').toString().trim();
+        if (newClient.isNotEmpty && newClient != 'Unknown') {
+          _clientCtrl.text = newClient;
         }
 
-        // ── Apply edits (update/remove existing materials) ──
-        final edits = (newData['edits'] as List?) ?? [];
-        final materialsList = _editableData['materials'] as List;
-        for (final edit in edits) {
-          if (edit is! Map) continue;
-          final action = edit['action']?.toString() ?? '';
-          final targetName =
-              (edit['item']?.toString() ?? '').toLowerCase().trim();
-          if (targetName.isEmpty) continue;
+        final newAddress = (newData['clientAddress'] ?? '').toString().trim();
+        if (newAddress.isNotEmpty) _clientAddressCtrl.text = newAddress;
 
-          // Find matching material by name (case-insensitive)
-          final matchIdx = materialsList.indexWhere((m) =>
-              m is Map &&
-              (m['item']?.toString() ?? '').toLowerCase().trim() == targetName);
+        final newPhone = (newData['clientPhone'] ?? '').toString().trim();
+        if (newPhone.isNotEmpty) _clientPhoneCtrl.text = newPhone;
 
-          if (matchIdx < 0) continue; // No match found
+        final newEmail = (newData['clientEmail'] ?? '').toString().trim();
+        if (newEmail.isNotEmpty) _clientEmailCtrl.text = newEmail;
 
-          if (action == 'remove') {
-            materialsList.removeAt(matchIdx);
-          } else if (action == 'update') {
-            final existing =
-                Map<String, dynamic>.from(materialsList[matchIdx] as Map);
-            if (edit['quantity'] != null) {
-              existing['quantity'] = (edit['quantity'] as num).toInt();
-            }
-            if (edit['unitPrice'] != null) {
-              existing['unitPrice'] = (edit['unitPrice'] as num).toDouble();
-            }
-            // Recalculate cost
-            final qty = (existing['quantity'] as num?)?.toInt() ?? 1;
-            final unitPrice =
-                (existing['unitPrice'] as num?)?.toDouble() ?? 0.0;
-            existing['cost'] = qty * unitPrice;
-            materialsList[matchIdx] = existing;
-          }
-        }
-
-        // ── Add new materials ──
-        final newMaterials = (newData['materials'] as List?) ?? [];
-        for (final m in newMaterials) {
-          if (m is Map) {
-            final mat = Map<String, dynamic>.from(m);
-            // Ensure quantity and unitPrice are present
-            final qty = (mat['quantity'] as num?)?.toInt() ?? 1;
-            final unitPrice = (mat['unitPrice'] as num?)?.toDouble();
-            final cost = (mat['cost'] as num?)?.toDouble() ?? 0.0;
-            mat['quantity'] = qty < 1 ? 1 : qty;
-            mat['unitPrice'] = unitPrice ?? (qty > 0 ? cost / qty : cost);
-            mat['cost'] = cost;
-            materialsList.add(mat);
-          }
-        }
-
-        // ── Update labor hours ──
-        // If edits contain labor change, replace instead of accumulate
-        final hasEdits = edits.isNotEmpty;
-        final newHours = newData['laborHours'] ?? newData['labor_hours'];
-        if (newHours != null) {
-          final additionalHours = (newHours as num).toDouble();
-          if (hasEdits && additionalHours > 0) {
-            // Edit mode: replace labor hours
-            _laborHoursCtrl.text = additionalHours.toString();
-          } else if (additionalHours > 0) {
-            // Add mode: accumulate labor hours
-            final currentHours = double.tryParse(_laborHoursCtrl.text) ?? 0;
-            _laborHoursCtrl.text = (currentHours + additionalHours).toString();
-          }
-        }
-
-        // ── Update labor type & rate ──
-        final newLaborType = newData['laborType']?.toString();
-        if (newLaborType != null && newLaborType != 'profile') {
-          _editableData['laborType'] = newLaborType;
-          if (newLaborType == 'hourly' && newData['laborRate'] != null) {
-            _editableData['laborRate'] =
-                (newData['laborRate'] as num).toDouble();
-          } else if (newLaborType == 'flat' && newData['laborAmount'] != null) {
-            _editableData['laborAmount'] =
-                (newData['laborAmount'] as num).toDouble();
-          }
-        }
-
-        // ── Update document type ──
         final newType = newData['type']?.toString();
-        if (newType != null &&
-            (newType == 'invoice' || newType == 'quote') &&
-            hasEdits) {
+        if (newType == 'invoice' || newType == 'quote') {
           _editableData['type'] = newType;
         }
 
-        // Update client name (replace if edits, otherwise only if empty)
-        final newClient =
-            (newData['clientName'] ?? newData['client_name'] ?? '')
-                .toString()
-                .trim();
-        if (newClient.isNotEmpty && newClient != 'Unknown') {
-          if (hasEdits || _clientCtrl.text.trim().isEmpty) {
-            _clientCtrl.text = newClient;
-          }
+        final newDesc = (newData['description'] ?? '').toString().trim();
+        if (newDesc.isNotEmpty) _descCtrl.text = newDesc;
+
+        // ── Labor ──
+        final newHours = newData['laborHours'];
+        if (newHours != null) {
+          _laborHoursCtrl.text = (newHours as num).toDouble().toString();
         }
+
+        final newLaborType = newData['laborType']?.toString();
+        if (newLaborType != null) {
+          _editableData['laborType'] = newLaborType;
+        }
+        if (newData['laborRate'] != null) {
+          _editableData['laborRate'] = (newData['laborRate'] as num).toDouble();
+        }
+        if (newData['laborAmount'] != null) {
+          _editableData['laborAmount'] =
+              (newData['laborAmount'] as num).toDouble();
+        }
+
+        // ── Markup ──
+        if (newData['markupPercent'] != null) {
+          _markupPercent = (newData['markupPercent'] as num).toDouble();
+          _markupCtrl.text = _markupPercent.toStringAsFixed(
+              _markupPercent == _markupPercent.roundToDouble() ? 0 : 1);
+        }
+
+        // ── Materials — smart merge to preserve UUIDs and receipt metadata ──
+        final newMaterials = (newData['materials'] as List?) ?? [];
+        final oldMaterials =
+            List<Map<String, dynamic>>.from(_editableData['materials'] as List);
+
+        // Build a lookup of old materials by name (case-insensitive) for metadata
+        final oldByName = <String, Map<String, dynamic>>{};
+        for (final m in oldMaterials) {
+          final name = (m['item']?.toString() ?? '').toLowerCase().trim();
+          if (name.isNotEmpty) oldByName[name] = m;
+        }
+
+        final mergedMaterials = <Map<String, dynamic>>[];
+        for (final nm in newMaterials) {
+          if (nm is! Map) continue;
+          final mat = Map<String, dynamic>.from(nm);
+          final name = (mat['item']?.toString() ?? '').toLowerCase().trim();
+
+          // Try to match with existing material to preserve UUID & receipt data
+          final existing = oldByName[name];
+          if (existing != null) {
+            // Preserve internal metadata from the old material
+            mat['id'] = existing['id'];
+            if (existing['fromReceipt'] == true) {
+              mat['fromReceipt'] = true;
+              mat['originalCost'] = existing['originalCost'];
+              mat['receiptId'] = existing['receiptId'];
+            }
+            // Remove from lookup so second match gets a new UUID
+            oldByName.remove(name);
+          } else {
+            // New material — assign a UUID
+            mat['id'] ??= const Uuid().v4();
+          }
+
+          // Ensure quantity, unitPrice, cost are valid
+          final qty = (mat['quantity'] as num?)?.toInt() ?? 1;
+          final unitPrice = (mat['unitPrice'] as num?)?.toDouble() ?? 0.0;
+          mat['quantity'] = qty < 1 ? 1 : qty;
+          mat['unitPrice'] = unitPrice;
+          mat['cost'] = qty * unitPrice;
+
+          mergedMaterials.add(mat);
+        }
+
+        _editableData['materials'] = mergedMaterials;
       });
 
+      // Show the AI's confirmation message
+      final aiMessage = (newData['message'] ?? '').toString().trim();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Voice details merged into document')),
+          SnackBar(
+            content: Text(
+              aiMessage.isNotEmpty
+                  ? aiMessage
+                  : 'Voice changes applied to document',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
         );
       }
     } catch (e) {
@@ -3015,7 +3046,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 /// Bottom sheet for voice refine — records additional voice input
 class _VoiceRefineSheet extends StatefulWidget {
   final VoiceCaptureNotifier notifier;
-  const _VoiceRefineSheet({required this.notifier});
+  final Map<String, dynamic>? invoiceContext;
+  const _VoiceRefineSheet({required this.notifier, this.invoiceContext});
 
   @override
   State<_VoiceRefineSheet> createState() => _VoiceRefineSheetState();
@@ -3042,7 +3074,7 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
       if (mounted) {
         setState(() {
           _isRecording = true;
-          _statusText = 'Listening... describe additional details';
+          _statusText = 'Listening... add, change, or remove anything';
         });
       }
     } catch (e) {
@@ -3182,7 +3214,7 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
       });
       try {
         final result = await widget.notifier
-            .stopAndProcess()
+            .stopAndProcess(invoiceContext: widget.invoiceContext)
             .timeout(const Duration(seconds: 45));
         if (result == null) {
           // Pipeline failed (error was swallowed by notifier)

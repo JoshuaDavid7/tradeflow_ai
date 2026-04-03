@@ -199,8 +199,10 @@ class VoiceCaptureService {
     });
   }
 
-  /// Stop recording and process with full pipeline
-  Future<VoiceCaptureResult> stopAndProcess() async {
+  /// Stop recording and process with full pipeline.
+  /// Pass [invoiceContext] when refining an existing invoice — the AI will see
+  /// the current document state and return the complete updated version.
+  Future<VoiceCaptureResult> stopAndProcess({Map<String, dynamic>? invoiceContext}) async {
     File? recordedFile;
 
     try {
@@ -294,7 +296,7 @@ class VoiceCaptureService {
 
       Map<String, dynamic> extractedData;
       try {
-        extractedData = await _extractWithRetry(transcript);
+        extractedData = await _extractWithRetry(transcript, invoiceContext);
       } catch (error) {
         ErrorHandler.warning(
           'Voice extraction failed, using transcript fallback',
@@ -466,9 +468,9 @@ class VoiceCaptureService {
   }
 
   /// Extract job data with retry logic
-  Future<Map<String, dynamic>> _extractWithRetry(String transcript) async {
+  Future<Map<String, dynamic>> _extractWithRetry(String transcript, [Map<String, dynamic>? invoiceContext]) async {
     return RetryUtil.retry(
-      () => _repository.extractJobData(transcript),
+      () => _repository.extractJobData(transcript, currentState: invoiceContext),
       config: const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
       onRetry: (attempt, error) {
         _updateProgress(
