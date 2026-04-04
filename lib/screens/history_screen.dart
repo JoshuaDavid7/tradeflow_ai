@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:intl/intl.dart';
 import '../core/theme/app_theme.dart';
+import '../domain/models/job.dart';
 import '../presentation/providers/job_provider.dart';
 import '../presentation/providers/analytics_provider.dart';
 import '../presentation/providers/customer_ledger_provider.dart';
+import '../presentation/providers/navigation_provider.dart';
 import '../presentation/providers/profile_provider.dart';
-import '../presentation/screens/main_shell_screen.dart';
 import '../presentation/widgets/record_payment_sheet.dart';
 import '../presentation/widgets/shimmer_loading.dart';
 import 'draft_review_screen.dart';
@@ -24,6 +25,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     with SingleTickerProviderStateMixin {
   final _supabase = Supabase.instance.client;
   late TabController _tabController;
+  late final ProviderSubscription<JobListState> _jobListSubscription;
+  late final ProviderSubscription<int> _historyTabSubscription;
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _allJobs = [];
@@ -36,80 +39,90 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     final requestedTab = ref.read(historyInitialTabProvider);
     final initialIndex =
         (requestedTab > 0 && requestedTab < 4) ? requestedTab : 0;
-    _tabController = TabController(
-        length: 4, initialIndex: initialIndex, vsync: this);
+    _tabController =
+        TabController(length: 4, initialIndex: initialIndex, vsync: this);
     // Consume the value so it doesn't re-trigger on rebuild.
     if (requestedTab != 0) {
-      Future.microtask(
-          () => ref.read(historyInitialTabProvider.notifier).state = 0);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(historyInitialTabProvider.notifier).state = 0;
+      });
     }
+    _jobListSubscription = ref.listenManual<JobListState>(
+      jobListProvider,
+      (previous, next) {
+        _syncFromJobState(next, notify: true);
+      },
+    );
+    _historyTabSubscription = ref.listenManual<int>(
+      historyInitialTabProvider,
+      (prev, next) {
+        if (next != 0 && next < _tabController.length) {
+          _tabController.animateTo(next);
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            ref.read(historyInitialTabProvider.notifier).state = 0;
+          });
+        }
+      },
+    );
+    _syncFromJobState(ref.read(jobListProvider), notify: false);
     _fetchJobs();
   }
 
   @override
   void dispose() {
+    _jobListSubscription.close();
+    _historyTabSubscription.close();
     _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _fetchJobs() async {
-    try {
-      final user = _supabase.auth.currentUser;
-      if (user == null) return;
+    await ref.read(jobListProvider.notifier).refresh();
+  }
 
-      final data = await _supabase
-          .from('jobs')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', ascending: false);
-      // Legacy rows with status='paid' are treated as 'sent' (document state).
-      final normalized = List<Map<String, dynamic>>.from(data).map((job) {
-        if (job['status']?.toString().toLowerCase() == 'paid') {
-          return <String, dynamic>{...job, 'status': 'sent'};
-        }
-        return job;
-      }).toList();
-      if (mounted) {
-        setState(() {
-          _allJobs = normalized;
-          _isLoading = false;
-          _error = null;
-        });
-      }
-    } catch (e) {
-      debugPrint('HistoryScreen: failed to load jobs: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _error = 'Could not load jobs. Pull down to retry.';
-        });
-      }
+  void _syncFromJobState(JobListState state, {required bool notify}) {
+    final normalized = state.jobs
+        .map<Map<String, dynamic>>((job) => _jobToHistoryMap(job))
+        .toList();
+
+    void apply() {
+      _allJobs = normalized;
+      _isLoading = state.isLoading && normalized.isEmpty;
+      _error = normalized.isEmpty ? state.error : null;
     }
+
+    if (notify && mounted) {
+      setState(apply);
+      return;
+    }
+    apply();
+  }
+
+  Map<String, dynamic> _jobToHistoryMap(Job job) {
+    final data = Map<String, dynamic>.from(job.toJson())
+      ..['id'] = job.id
+      ..['created_at'] = job.createdAt.toIso8601String();
+    return data;
   }
 
   List<Map<String, dynamic>> _getFilteredJobs(String filter) {
     switch (filter) {
       case 'draft':
         return _allJobs
-            .where((j) =>
-                j['status']?.toString().toLowerCase() == 'draft')
+            .where((j) => j['status']?.toString().toLowerCase() == 'draft')
             .toList();
       case 'sent':
-        // All sent documents. If the outstanding filter is active, only
-        // show invoices with remaining balance > 0.
-        final outstandingOnly =
-            ref.watch(historyOutstandingFilterProvider);
+        // Show sent invoices that still have an outstanding balance.
+        // Fully paid invoices appear in the Paid tab instead.
         return _allJobs.where((j) {
           if (j['status']?.toString().toLowerCase() != 'sent') return false;
-          if (!outstandingOnly) return true;
           final total =
               double.tryParse(j['total_amount']?.toString() ?? '0') ?? 0;
           final amountPaid =
               double.tryParse(j['amount_paid']?.toString() ?? '0') ?? 0;
           if (total > 0 && amountPaid >= total - 0.01) return false;
-          // Also exclude quotes from outstanding filter
-          final type = j['type']?.toString().toLowerCase() ?? 'invoice';
-          if (type == 'quote') return false;
           return true;
         }).toList();
       case 'paid':
@@ -127,8 +140,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         return _allJobs;
     }
   }
-
-
 
   /// Mark a job as paid via the repository layer — records a real payment,
   /// updates amount_paid / amount_due, and creates a local payment record
@@ -164,8 +175,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           SnackBar(
             content: const Row(
               children: [
-                Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 18),
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                 SizedBox(width: 10),
                 Text('Payment recorded',
                     style: TextStyle(fontWeight: FontWeight.w600)),
@@ -199,16 +209,6 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    // Listen for deep-link tab navigation from dashboard (e.g. active jobs chip)
-    ref.listen<int>(historyInitialTabProvider, (prev, next) {
-      if (next != 0 && next < _tabController.length) {
-        _tabController.animateTo(next);
-        Future.microtask(
-            () => ref.read(historyInitialTabProvider.notifier).state = 0);
-      }
-    });
-
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Job Pipeline'),
@@ -219,7 +219,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           tabs: [
             Tab(text: 'All (${_allJobs.length})'),
             Tab(text: 'Drafts (${_getFilteredJobs('draft').length})'),
-            Tab(text: 'Sent (${_getFilteredJobs('sent').length})'),
+            Tab(text: 'Unpaid (${_getFilteredJobs('sent').length})'),
             Tab(text: 'Paid (${_getFilteredJobs('paid').length})'),
           ],
         ),
@@ -268,9 +268,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0.0;
         final type = job['type']?.toString() ?? 'invoice';
 
-        final isSent = status == 'sent' ||
-            status == 'paid' ||
-            status == 'cancelled';
+        final isSent =
+            status == 'sent' || status == 'paid' || status == 'cancelled';
         final isCancelled = status == 'cancelled';
 
         return GestureDetector(
@@ -314,9 +313,11 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                   ),
                   const SizedBox(height: 8),
                   Text(
-                      (job['client_name']?.toString().trim().isNotEmpty ?? false)
+                      (job['client_name']?.toString().trim().isNotEmpty ??
+                              false)
                           ? job['client_name'].toString().trim()
-                          : (job['title']?.toString().trim().isNotEmpty ?? false)
+                          : (job['title']?.toString().trim().isNotEmpty ??
+                                  false)
                               ? job['title'].toString().trim()
                               : 'Untitled Job',
                       overflow: TextOverflow.ellipsis,
@@ -324,7 +325,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
                         // Mute cancelled cards so amount doesn't read as active
-                        color: isCancelled ? colorScheme.onSurfaceVariant : null,
+                        color:
+                            isCancelled ? colorScheme.onSurfaceVariant : null,
                       )),
                   const SizedBox(height: 2),
                   // Show description only if meaningful (not empty/generic).
@@ -359,9 +361,14 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                           maxLines: 1,
                           style: textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: isCancelled ? colorScheme.onSurfaceVariant : null,
-                            decoration: isCancelled ? TextDecoration.lineThrough : null,
-                            decorationColor: isCancelled ? colorScheme.onSurfaceVariant : null,
+                            color: isCancelled
+                                ? colorScheme.onSurfaceVariant
+                                : null,
+                            decoration:
+                                isCancelled ? TextDecoration.lineThrough : null,
+                            decorationColor: isCancelled
+                                ? colorScheme.onSurfaceVariant
+                                : null,
                           )),
                       const SizedBox(width: 12),
                       // Status action buttons inline after price
@@ -374,7 +381,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                       padding: const EdgeInsets.only(top: 2),
                       child: Text('Superseded — no longer active',
                           style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
                             fontStyle: FontStyle.italic,
                             fontSize: 11,
                           )),
@@ -388,18 +396,21 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
-  List<Widget> _buildStatusActionsList(BuildContext context, Map<String, dynamic> job) {
+  List<Widget> _buildStatusActionsList(
+      BuildContext context, Map<String, dynamic> job) {
     final jobId = job['id']?.toString() ?? '';
     final currentStatus = job['status']?.toString().toLowerCase() ?? 'draft';
-    final total =
-        double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
+    final total = double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
     final amountPaid =
         double.tryParse(job['amount_paid']?.toString() ?? '0') ?? 0;
     final isFullyPaid = total > 0 && amountPaid >= total - 0.01;
 
     if (currentStatus == 'draft') {
       return [
-        _actionChip(context, 'Edit', Icons.edit_outlined,
+        _actionChip(
+            context,
+            'Edit',
+            Icons.edit_outlined,
             Theme.of(context).colorScheme.primary,
             () => Navigator.push(
                   context,
@@ -421,7 +432,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.check_circle, color: AppColors.paid(context), size: 18),
+                Icon(Icons.check_circle,
+                    color: AppColors.paid(context), size: 18),
                 const SizedBox(width: 4),
                 Text('Paid in full',
                     style: TextStyle(
@@ -438,7 +450,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
           return [
             Text('\u2014 no balance',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurfaceVariant
+                      .withValues(alpha: 0.6),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   fontStyle: FontStyle.italic,
@@ -476,8 +491,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
 
   /// Returns true if the invoice has a partial payment (> 0 but not fully paid).
   bool _hasPartialPayment(Map<String, dynamic> job) {
-    final total =
-        double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
+    final total = double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
     final amountPaid =
         double.tryParse(job['amount_paid']?.toString() ?? '0') ?? 0;
     if (total <= 0 || amountPaid < 0.01) return false;
@@ -487,8 +501,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   Future<void> _confirmDeleteJob(String jobId) async {
     // Safety: only allow deletion of drafts. Sent/paid/cancelled jobs
     // are financial records that must not be casually removed.
-    final job = _allJobs.firstWhere(
-        (j) => j['id']?.toString() == jobId,
+    final job = _allJobs.firstWhere((j) => j['id']?.toString() == jobId,
         orElse: () => <String, dynamic>{});
     final status = job['status']?.toString().toLowerCase() ?? '';
     if (status != 'draft') {
@@ -507,7 +520,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Draft'),
-        content: const Text('Are you sure you want to delete this draft? This action cannot be undone.'),
+        content: const Text(
+            'Are you sure you want to delete this draft? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -552,7 +566,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
   /// De-emphasized delete button — text-only, no background, positioned after
   /// the primary status actions to reduce accidental taps.
   Widget _deleteChip(BuildContext context, VoidCallback onTap) {
-    final deleteColor = Theme.of(context).colorScheme.error.withValues(alpha: 0.7);
+    final deleteColor =
+        Theme.of(context).colorScheme.error.withValues(alpha: 0.7);
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 36),
       child: InkWell(
@@ -567,7 +582,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
               const SizedBox(width: 3),
               Text('Delete',
                   style: TextStyle(
-                      color: deleteColor, fontSize: 11, fontWeight: FontWeight.w600)),
+                      color: deleteColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -575,8 +592,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     );
   }
 
-  Widget _actionChip(
-      BuildContext context, String label, IconData icon, Color color, VoidCallback onTap) {
+  Widget _actionChip(BuildContext context, String label, IconData icon,
+      Color color, VoidCallback onTap) {
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 36),
       child: InkWell(
@@ -594,8 +611,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
             children: [
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 4),
-              Text(label,
-                  style: AppTextStyles.chipLabel(color)),
+              Text(label, style: AppTextStyles.chipLabel(color)),
             ],
           ),
         ),
@@ -610,8 +626,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
     IconData icon;
 
     // Payment-aware: fully-paid sent invoices show "PAID" badge.
-    final total =
-        double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
+    final total = double.tryParse(job['total_amount']?.toString() ?? '0') ?? 0;
     final amountPaid =
         double.tryParse(job['amount_paid']?.toString() ?? '0') ?? 0;
     final isFullyPaid = total > 0 && amountPaid >= total - 0.01;
@@ -653,8 +668,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         children: [
           Icon(icon, size: 10, color: color),
           const SizedBox(width: 3),
-          Text(label,
-              style: AppTextStyles.badge(color)),
+          Text(label, style: AppTextStyles.badge(color)),
         ],
       ),
     );
@@ -668,8 +682,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(6)),
-      child: Text(type.toUpperCase(),
-          style: AppTextStyles.badge(color)),
+      child: Text(type.toUpperCase(), style: AppTextStyles.badge(color)),
     );
   }
 
@@ -681,13 +694,13 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.work_off_outlined, size: 56, color: colorScheme.outlineVariant),
+          Icon(Icons.work_off_outlined,
+              size: 56, color: colorScheme.outlineVariant),
           const SizedBox(height: 16),
           Text('No jobs here yet',
               style: AppTextStyles.emptyTitle(textTheme, colorScheme)),
           const SizedBox(height: 8),
-          Text(
-              'Create your first invoice or quote to see it here',
+          Text('Create your first invoice or quote to see it here',
               textAlign: TextAlign.center,
               style: AppTextStyles.emptyBody(textTheme, colorScheme)),
           const SizedBox(height: 20),
@@ -717,7 +730,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off_rounded, size: 64, color: colorScheme.error.withValues(alpha: 0.5)),
+            Icon(Icons.cloud_off_rounded,
+                size: 64, color: colorScheme.error.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text('Something went wrong',
                 style: textTheme.titleSmall?.copyWith(
