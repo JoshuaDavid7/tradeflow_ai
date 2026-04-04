@@ -1329,43 +1329,12 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   Future<void> _showSecurePaymentLinkDialog(
       SecureCheckoutSession checkout) async {
     final url = checkout.checkoutUrl;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Secure Payment Link Ready'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'The PDF now includes a secure checkout link and QR code.',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 10),
-            SelectableText(
-              url,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: url));
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Payment link copied')),
-              );
-            },
-            icon: const Icon(Icons.copy, size: 16),
-            label: const Text('Copy Link'),
-          ),
-        ],
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Payment link added to PDF and copied to clipboard'),
+        duration: Duration(seconds: 3),
       ),
     );
   }
