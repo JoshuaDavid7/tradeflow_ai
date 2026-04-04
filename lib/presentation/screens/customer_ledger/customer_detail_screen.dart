@@ -2025,13 +2025,15 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               ),
             ),
             Positioned(
-              bottom: 20,
+              bottom: 40,
               right: 20,
-              child: FloatingActionButton(
+              child: FloatingActionButton.extended(
                 heroTag: 'customer_notes_fab',
-                elevation: 2,
+                elevation: 3,
                 onPressed: _openNoteEditor,
-                child: const Icon(Icons.note_add),
+                icon: const Icon(Icons.note_add, size: 20),
+                label: const Text('New Note',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
               ),
             ),
           ],
