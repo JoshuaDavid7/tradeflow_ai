@@ -280,7 +280,7 @@ class _AnalyticsDashboardState extends ConsumerState<AnalyticsDashboard>
       children: [
         Expanded(
           child: _HeroCard(
-            title: 'Gross Income',
+            title: 'Income',
             value: '$cs${analytics.monthlyRevenue.toStringAsFixed(0)}',
             subtitle: 'Cash received',
             icon: Icons.trending_up,
