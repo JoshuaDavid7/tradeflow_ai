@@ -1587,7 +1587,22 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     );
   }
 
-  /// Pick from existing logged expenses to add as materials
+  /// Represents a single selectable item for import — either a whole expense
+  /// or an individual receipt line item within an expense.
+  List<ReceiptLineItem> _parseReceiptItems(Expense expense) {
+    final raw = expense.ocrText;
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final result = ReceiptAiResult.fromJsonString(raw);
+      return result.items;
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Pick from existing logged expenses to add as materials.
+  /// When an expense has receipt line items, the user can expand it
+  /// and pick individual items instead of the whole expense total.
   Future<void> _pickFromExpenses() async {
     final container = ProviderScope.containerOf(context);
     final expenseState = container.read(expenseListProvider);
@@ -1602,7 +1617,6 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       return;
     }
 
-    // Filter to expenses that have an amount
     final alreadyLinkedIds = (_editableData['materials'] as List)
         .where((m) => m['expenseId'] != null)
         .map((m) => m['expenseId'].toString())
@@ -1624,7 +1638,37 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final cs = Theme.of(context).colorScheme;
     final symbol = _profile?.currencySymbol ?? '\$';
     final f = NumberFormat.currency(symbol: symbol);
-    final selected = <Expense>{};
+
+    // Track which whole expenses are selected (no line items)
+    final selectedWholeExpenses = <Expense>{};
+    // Track which individual line items are selected: expenseId → set of item indices
+    final selectedLineItems = <String, Set<int>>{};
+    // Track which expenses are expanded to show line items
+    final expandedExpenses = <String>{};
+
+    int totalSelectedCount() {
+      int count = selectedWholeExpenses.length;
+      for (final indices in selectedLineItems.values) {
+        count += indices.length;
+      }
+      return count;
+    }
+
+    double totalSelectedAmount() {
+      double total = 0;
+      for (final e in selectedWholeExpenses) {
+        total += e.amount;
+      }
+      for (final entry in selectedLineItems.entries) {
+        final expense = available.firstWhere((e) => e.id == entry.key,
+            orElse: () => available.first);
+        final items = _parseReceiptItems(expense);
+        for (final idx in entry.value) {
+          if (idx < items.length) total += items[idx].totalPrice;
+        }
+      }
+      return total;
+    }
 
     await showModalBottomSheet(
       context: context,
@@ -1635,6 +1679,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
+            final count = totalSelectedCount();
             return DraggableScrollableSheet(
               initialChildSize: 0.7,
               maxChildSize: 0.9,
@@ -1643,17 +1688,14 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               builder: (_, scrollCtrl) {
                 return Column(
                   children: [
-                    // Handle bar
                     Container(
                       margin: const EdgeInsets.only(top: 8),
-                      width: 40,
-                      height: 4,
+                      width: 40, height: 4,
                       decoration: BoxDecoration(
                         color: cs.outlineVariant,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    // Header
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
                       child: Row(
@@ -1669,23 +1711,22 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                                         fontSize: 18,
                                         fontWeight: FontWeight.w700)),
                                 Text(
-                                  'Select expenses to add as materials',
+                                  'Tap expenses with receipts to see line items',
                                   style: TextStyle(
                                       fontSize: 12, color: cs.onSurfaceVariant),
                                 ),
                               ],
                             ),
                           ),
-                          if (selected.isNotEmpty)
+                          if (count > 0)
                             FilledButton(
                               onPressed: () => Navigator.pop(ctx, true),
-                              child: Text('Add ${selected.length}'),
+                              child: Text('Add $count'),
                             ),
                         ],
                       ),
                     ),
                     const Divider(),
-                    // Expense list
                     Expanded(
                       child: ListView.builder(
                         controller: scrollCtrl,
@@ -1693,83 +1734,280 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         itemBuilder: (_, i) {
                           final expense = available[i];
-                          final isSelected = selected.contains(expense);
+                          final receiptItems = _parseReceiptItems(expense);
+                          final hasLineItems = receiptItems.isNotEmpty;
+                          final isExpanded = expandedExpenses.contains(expense.id);
+                          final isWholeSelected =
+                              selectedWholeExpenses.contains(expense);
+                          final itemSelections =
+                              selectedLineItems[expense.id] ?? <int>{};
+                          final hasAnySelection =
+                              isWholeSelected || itemSelections.isNotEmpty;
                           final cat = expense.category;
                           final dateStr =
                               DateFormat('MMM d').format(expense.expenseDate);
-                          final hasReceipt = expense.hasReceipt;
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 6),
                             decoration: BoxDecoration(
-                              color: isSelected
+                              color: hasAnySelection
                                   ? cs.primaryContainer.withValues(alpha: 0.3)
                                   : cs.surfaceContainerLow,
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: isSelected
+                                color: hasAnySelection
                                     ? cs.primary.withValues(alpha: 0.5)
                                     : cs.outlineVariant.withValues(alpha: 0.3),
                               ),
                             ),
-                            child: ListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 2),
-                              leading: CircleAvatar(
-                                radius: 18,
-                                backgroundColor: isSelected
-                                    ? cs.primary.withValues(alpha: 0.15)
-                                    : cs.surfaceContainerHigh,
-                                child: isSelected
-                                    ? Icon(Icons.check,
-                                        size: 18, color: cs.primary)
-                                    : Icon(_getCategoryIcon(cat),
-                                        size: 18, color: cs.onSurfaceVariant),
-                              ),
-                              title: Text(
-                                expense.description,
-                                style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                [
-                                  if (expense.vendor != null &&
-                                      expense.vendor!.isNotEmpty)
-                                    expense.vendor!,
-                                  dateStr,
-                                  cat.displayName,
-                                  if (hasReceipt) 'Has receipt',
-                                ].join(' · '),
-                                style: TextStyle(
-                                    fontSize: 11, color: cs.onSurfaceVariant),
-                              ),
-                              trailing: Text(
-                                f.format(expense.amount),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: isSelected ? cs.primary : cs.onSurface,
+                            child: Column(
+                              children: [
+                                // ── Expense header row ──
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () {
+                                    setSheetState(() {
+                                      if (hasLineItems) {
+                                        // Toggle expand to show line items
+                                        if (isExpanded) {
+                                          expandedExpenses.remove(expense.id);
+                                        } else {
+                                          expandedExpenses.add(expense.id);
+                                        }
+                                      } else {
+                                        // No line items — toggle whole expense
+                                        if (isWholeSelected) {
+                                          selectedWholeExpenses.remove(expense);
+                                        } else {
+                                          selectedWholeExpenses.add(expense);
+                                        }
+                                      }
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 18,
+                                          backgroundColor: hasAnySelection
+                                              ? cs.primary
+                                                  .withValues(alpha: 0.15)
+                                              : cs.surfaceContainerHigh,
+                                          child: hasAnySelection
+                                              ? Icon(Icons.check,
+                                                  size: 18, color: cs.primary)
+                                              : Icon(_getCategoryIcon(cat),
+                                                  size: 18,
+                                                  color: cs.onSurfaceVariant),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                expense.description,
+                                                style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                [
+                                                  if (expense.vendor != null &&
+                                                      expense
+                                                          .vendor!.isNotEmpty)
+                                                    expense.vendor!,
+                                                  dateStr,
+                                                  cat.displayName,
+                                                  if (hasLineItems)
+                                                    '${receiptItems.length} items',
+                                                ].join(' · '),
+                                                style: TextStyle(
+                                                    fontSize: 11,
+                                                    color:
+                                                        cs.onSurfaceVariant),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          f.format(expense.amount),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: hasAnySelection
+                                                ? cs.primary
+                                                : cs.onSurface,
+                                          ),
+                                        ),
+                                        if (hasLineItems) ...[
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            isExpanded
+                                                ? Icons
+                                                    .keyboard_arrow_up_rounded
+                                                : Icons
+                                                    .keyboard_arrow_down_rounded,
+                                            size: 20,
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              onTap: () {
-                                setSheetState(() {
-                                  if (isSelected) {
-                                    selected.remove(expense);
-                                  } else {
-                                    selected.add(expense);
-                                  }
-                                });
-                              },
+                                // ── Expanded line items ──
+                                if (isExpanded && hasLineItems) ...[
+                                  Divider(
+                                      height: 1,
+                                      indent: 16,
+                                      endIndent: 16,
+                                      color: cs.outlineVariant
+                                          .withValues(alpha: 0.3)),
+                                  // "Select All" row
+                                  InkWell(
+                                    onTap: () {
+                                      setSheetState(() {
+                                        final allIndices = List.generate(
+                                            receiptItems.length, (i) => i)
+                                            .toSet();
+                                        if (itemSelections.length ==
+                                            receiptItems.length) {
+                                          // Deselect all
+                                          selectedLineItems
+                                              .remove(expense.id);
+                                        } else {
+                                          // Select all
+                                          selectedLineItems[expense.id] =
+                                              allIndices;
+                                        }
+                                        // Clear whole-expense selection since
+                                        // we're using line-level now
+                                        selectedWholeExpenses.remove(expense);
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 8),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            itemSelections.length ==
+                                                    receiptItems.length
+                                                ? Icons.check_box
+                                                : Icons
+                                                    .check_box_outline_blank,
+                                            size: 18,
+                                            color: cs.primary,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Select all items',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: cs.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  // Individual line items
+                                  ...List.generate(receiptItems.length, (idx) {
+                                    final item = receiptItems[idx];
+                                    final isItemSelected =
+                                        itemSelections.contains(idx);
+                                    return InkWell(
+                                      onTap: () {
+                                        setSheetState(() {
+                                          final set =
+                                              selectedLineItems.putIfAbsent(
+                                                  expense.id, () => <int>{});
+                                          if (isItemSelected) {
+                                            set.remove(idx);
+                                            if (set.isEmpty) {
+                                              selectedLineItems
+                                                  .remove(expense.id);
+                                            }
+                                          } else {
+                                            set.add(idx);
+                                          }
+                                          selectedWholeExpenses.remove(expense);
+                                        });
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 16, vertical: 6),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isItemSelected
+                                                  ? Icons.check_box
+                                                  : Icons
+                                                      .check_box_outline_blank,
+                                              size: 18,
+                                              color: isItemSelected
+                                                  ? cs.primary
+                                                  : cs.outlineVariant,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                item.name,
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: isItemSelected
+                                                      ? cs.onSurface
+                                                      : cs.onSurfaceVariant,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (item.quantity > 1)
+                                              Padding(
+                                                padding: const EdgeInsets.only(
+                                                    right: 8),
+                                                child: Text(
+                                                  '×${item.quantity}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: cs.onSurfaceVariant,
+                                                  ),
+                                                ),
+                                              ),
+                                            Text(
+                                              f.format(item.totalPrice),
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: isItemSelected
+                                                    ? cs.primary
+                                                    : cs.onSurface,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                  const SizedBox(height: 6),
+                                ],
+                              ],
                             ),
                           );
                         },
                       ),
                     ),
-                    // Running total
-                    if (selected.isNotEmpty)
+                    // Running total footer
+                    if (count > 0)
                       Container(
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
                         decoration: BoxDecoration(
@@ -1781,13 +2019,12 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              '${selected.length} expense${selected.length > 1 ? 's' : ''} selected',
+                              '$count item${count > 1 ? 's' : ''} selected',
                               style: TextStyle(
                                   fontSize: 13, color: cs.onSurfaceVariant),
                             ),
                             Text(
-                              f.format(selected.fold(
-                                  0.0, (sum, e) => sum + e.amount)),
+                              f.format(totalSelectedAmount()),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -1805,32 +2042,61 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
         );
       },
     ).then((confirmed) {
-      if (confirmed == true && selected.isNotEmpty) {
-        setState(() {
-          for (final expense in selected) {
-            final cost = expense.amount;
+      if (confirmed != true) return;
+
+      setState(() {
+        // Add whole-expense selections
+        for (final expense in selectedWholeExpenses) {
+          final cost = expense.amount;
+          final markedUpCost =
+              _markupPercent > 0 ? cost * (1 + _markupPercent / 100) : cost;
+          (_editableData['materials'] as List).add({
+            'item': expense.description,
+            'quantity': 1,
+            'unitPrice': double.parse(markedUpCost.toStringAsFixed(2)),
+            'cost': double.parse(markedUpCost.toStringAsFixed(2)),
+            'originalCost': cost,
+            'fromReceipt': expense.hasReceipt,
+            'expenseId': expense.id,
+          });
+        }
+
+        // Add individual line-item selections
+        for (final entry in selectedLineItems.entries) {
+          final expense = available.firstWhere((e) => e.id == entry.key,
+              orElse: () => available.first);
+          final items = _parseReceiptItems(expense);
+          for (final idx in entry.value) {
+            if (idx >= items.length) continue;
+            final item = items[idx];
+            final cost = item.totalPrice;
             final markedUpCost =
                 _markupPercent > 0 ? cost * (1 + _markupPercent / 100) : cost;
             (_editableData['materials'] as List).add({
-              'item': expense.description,
-              'quantity': 1,
-              'unitPrice': double.parse(markedUpCost.toStringAsFixed(2)),
+              'item': item.name,
+              'quantity': item.quantity,
+              'unitPrice': double.parse(
+                  (markedUpCost / (item.quantity > 0 ? item.quantity : 1))
+                      .toStringAsFixed(2)),
               'cost': double.parse(markedUpCost.toStringAsFixed(2)),
               'originalCost': cost,
-              'fromReceipt': expense.hasReceipt,
+              'fromReceipt': true,
               'expenseId': expense.id,
             });
           }
-          _isDirty = true;
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  '${selected.length} expense${selected.length > 1 ? 's' : ''} added as materials${_markupPercent > 0 ? ' with ${_markupPercent.toStringAsFixed(0)}% markup' : ''}'),
-            ),
-          );
         }
+
+        _isDirty = true;
+      });
+
+      final count = totalSelectedCount();
+      if (mounted && count > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '$count item${count > 1 ? 's' : ''} added as materials${_markupPercent > 0 ? ' with ${_markupPercent.toStringAsFixed(0)}% markup' : ''}'),
+          ),
+        );
       }
     });
   }
