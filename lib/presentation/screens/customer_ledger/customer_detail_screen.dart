@@ -18,9 +18,13 @@ import '../../../screens/pdf_preview_screen.dart';
 import 'project_detail_screen.dart';
 import 'note_editor_screen.dart';
 import 'block_editor/note_block.dart';
+import '../../providers/ai_assistant_provider.dart';
+import '../../services/ai_action_coordinator.dart';
+import '../../widgets/ai_assistant_overlay.dart';
 import '../expenses/add_expense_screen.dart';
 import '../../../data/local/database.dart' show databaseProvider;
-import '../../../data/repositories/expense_repository.dart' show expenseRepositoryProvider;
+import '../../../data/repositories/expense_repository.dart'
+    show expenseRepositoryProvider;
 
 class CustomerDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> customer;
@@ -167,10 +171,34 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           controller: _tabController,
           isScrollable: false,
           tabs: [
-            Tab(text: _tabLabel('Projects', ref.watch(customerProjectsProvider(_customerId)).valueOrNull?.length)),
-            Tab(text: _tabLabel('Jobs', ref.watch(customerJobsProvider(_customerId)).valueOrNull?.length)),
-            Tab(text: _tabLabel('Expenses', ref.watch(customerExpensesProvider(_customerId)).valueOrNull?.length)),
-            Tab(text: _tabLabel('Notes', ref.watch(customerNotesProvider(_customerId)).valueOrNull?.length)),
+            Tab(
+                text: _tabLabel(
+                    'Projects',
+                    ref
+                        .watch(customerProjectsProvider(_customerId))
+                        .valueOrNull
+                        ?.length)),
+            Tab(
+                text: _tabLabel(
+                    'Jobs',
+                    ref
+                        .watch(customerJobsProvider(_customerId))
+                        .valueOrNull
+                        ?.length)),
+            Tab(
+                text: _tabLabel(
+                    'Expenses',
+                    ref
+                        .watch(customerExpensesProvider(_customerId))
+                        .valueOrNull
+                        ?.length)),
+            Tab(
+                text: _tabLabel(
+                    'Notes',
+                    ref
+                        .watch(customerNotesProvider(_customerId))
+                        .valueOrNull
+                        ?.length)),
           ],
         ),
       ),
@@ -214,11 +242,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           final type = (job['type']?.toString().toLowerCase() ?? 'invoice');
           final status = (job['status']?.toString().toLowerCase() ?? 'draft');
           if (type == 'quote') continue; // Don't count quotes as billed
-          if (status == 'cancelled' || status == 'superseded') continue; // Don't count cancelled/superseded invoices
+          if (status == 'cancelled' || status == 'superseded')
+            continue; // Don't count cancelled/superseded invoices
           final total = (job['total_amount'] as num?)?.toDouble() ?? 0.0;
           totalBilled += total;
-          final amountPaid =
-              (job['amount_paid'] as num?)?.toDouble() ?? 0.0;
+          final amountPaid = (job['amount_paid'] as num?)?.toDouble() ?? 0.0;
           totalPaid += amountPaid;
         }
         final balance = totalBilled - totalPaid;
@@ -238,26 +266,41 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
     );
   }
 
-  Widget _buildSummaryRow(double totalBilled, double totalPaid, double balance) {
+  Widget _buildSummaryRow(
+      double totalBilled, double totalPaid, double balance) {
     final curr = ref.watch(currencySymbolProvider);
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+        color: Theme.of(context)
+            .colorScheme
+            .primaryContainer
+            .withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Flexible(child: _buildStat('Billed', '$curr${totalBilled.toStringAsFixed(0)}',
-              Theme.of(context).colorScheme.primary)),
-          Container(height: 30, width: 1, color: Theme.of(context).colorScheme.outlineVariant),
-          Flexible(child: _buildStat(
-              'Paid', '$curr${totalPaid.toStringAsFixed(0)}', AppColors.paid(context))),
-          Container(height: 30, width: 1, color: Theme.of(context).colorScheme.outlineVariant),
-          Flexible(child: _buildStat(
+          Flexible(
+              child: _buildStat(
+                  'Billed',
+                  '$curr${totalBilled.toStringAsFixed(0)}',
+                  Theme.of(context).colorScheme.primary)),
+          Container(
+              height: 30,
+              width: 1,
+              color: Theme.of(context).colorScheme.outlineVariant),
+          Flexible(
+              child: _buildStat('Paid', '$curr${totalPaid.toStringAsFixed(0)}',
+                  AppColors.paid(context))),
+          Container(
+              height: 30,
+              width: 1,
+              color: Theme.of(context).colorScheme.outlineVariant),
+          Flexible(
+              child: _buildStat(
             'Outstanding',
             '$curr${balance.toStringAsFixed(0)}',
             balance > 0 ? AppColors.sent(context) : AppColors.paid(context),
@@ -460,8 +503,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             children: [
               Icon(icon, size: 20, color: cs.primary),
               const SizedBox(height: 4),
-              Text(label, style: AppTextStyles.metadata(textTheme, cs)
-                  .copyWith(fontWeight: FontWeight.w600, color: cs.primary)),
+              Text(label,
+                  style: AppTextStyles.metadata(textTheme, cs).copyWith(
+                      fontWeight: FontWeight.w600, color: cs.primary)),
             ],
           ),
         ),
@@ -487,7 +531,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
 
     if (unpaidJobs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No outstanding invoices for this client')),
+        const SnackBar(
+            content: Text('No outstanding invoices for this client')),
       );
       return;
     }
@@ -516,7 +561,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               children: [
                 Center(
                   child: Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: cs.outlineVariant,
                       borderRadius: BorderRadius.circular(2),
@@ -524,10 +570,12 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text('Select Invoice', style: AppTextStyles.sheetTitle(textTheme)),
+                Text('Select Invoice',
+                    style: AppTextStyles.sheetTitle(textTheme)),
                 const SizedBox(height: 12),
                 ...unpaidJobs.map((job) {
-                  final total = (job['total_amount'] as num?)?.toDouble() ?? 0.0;
+                  final total =
+                      (job['total_amount'] as num?)?.toDouble() ?? 0.0;
                   final paid = (job['amount_paid'] as num?)?.toDouble() ?? 0.0;
                   final due = total - paid;
                   final title = job['title'] ?? job['client_name'] ?? 'Invoice';
@@ -535,8 +583,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                     leading: Icon(Icons.receipt_long, color: cs.primary),
-                    title: Text(title,
-                        style: AppTextStyles.cardTitle(textTheme)),
+                    title:
+                        Text(title, style: AppTextStyles.cardTitle(textTheme)),
                     subtitle: Text(
                         'Total: $curr${total.toStringAsFixed(2)}  •  Due: $curr${due.toStringAsFixed(2)}',
                         style: AppTextStyles.cardSubtitle(textTheme, cs)),
@@ -593,8 +641,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           SnackBar(
             content: const Row(
               children: [
-                Icon(Icons.check_circle_rounded,
-                    color: Colors.white, size: 18),
+                Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
                 SizedBox(width: 10),
                 Text('Payment recorded',
                     style: TextStyle(fontWeight: FontWeight.w600)),
@@ -626,60 +673,65 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         }
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(customerProjectsProvider(_customerId)),
+          onRefresh: () async =>
+              ref.invalidate(customerProjectsProvider(_customerId)),
           child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: projects.length,
-          itemBuilder: (context, index) {
-            final project = projects[index];
-            final status = project['status'] ?? 'active';
-            final statusColor = status == 'completed'
-                ? AppColors.paid(context)
-                : status == 'archived'
-                    ? AppColors.draft(context)
-                    : Theme.of(context).colorScheme.primary;
+            padding: const EdgeInsets.all(16),
+            itemCount: projects.length,
+            itemBuilder: (context, index) {
+              final project = projects[index];
+              final status = project['status'] ?? 'active';
+              final statusColor = status == 'completed'
+                  ? AppColors.paid(context)
+                  : status == 'archived'
+                      ? AppColors.draft(context)
+                      : Theme.of(context).colorScheme.primary;
 
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              child: ListTile(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ProjectDetailScreen(
-                      project: project,
-                      customerName: _customerName,
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                child: ListTile(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProjectDetailScreen(
+                        project: project,
+                        customerName: _customerName,
+                      ),
+                    ),
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: statusColor.withValues(alpha: 0.2),
+                    child: Icon(Icons.folder, color: statusColor, size: 20),
+                  ),
+                  title: Text(project['name'] ?? 'Untitled',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style:
+                          AppTextStyles.cardTitle(Theme.of(context).textTheme)),
+                  subtitle: Text(project['description'] ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.cardSubtitle(
+                          Theme.of(context).textTheme,
+                          Theme.of(context).colorScheme)),
+                  trailing: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      status.toString().toUpperCase(),
+                      style: AppTextStyles.badge(statusColor),
                     ),
                   ),
                 ),
-                leading: CircleAvatar(
-                  backgroundColor: statusColor.withValues(alpha: 0.2),
-                  child: Icon(Icons.folder, color: statusColor, size: 20),
-                ),
-                title: Text(project['name'] ?? 'Untitled',
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: AppTextStyles.cardTitle(Theme.of(context).textTheme)),
-                subtitle: Text(project['description'] ?? '',
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.cardSubtitle(Theme.of(context).textTheme, Theme.of(context).colorScheme)),
-                trailing: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    status.toString().toUpperCase(),
-                    style: AppTextStyles.badge(statusColor),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
+              );
+            },
+          ),
         );
       },
       loading: () => const Padding(
@@ -713,7 +765,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         }
 
         return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(customerJobsProvider(_customerId)),
+          onRefresh: () async =>
+              ref.invalidate(customerJobsProvider(_customerId)),
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
             itemCount: jobs.length,
@@ -721,11 +774,10 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               final job = jobs[index];
               final type = job['type'] ?? 'invoice';
               final status = job['status'] ?? 'draft';
-              final total =
-                  (job['total_amount'] as num?)?.toDouble() ?? 0.0;
-              final createdAt = DateTime.tryParse(
-                      job['created_at']?.toString() ?? '') ??
-                  DateTime.now();
+              final total = (job['total_amount'] as num?)?.toDouble() ?? 0.0;
+              final createdAt =
+                  DateTime.tryParse(job['created_at']?.toString() ?? '') ??
+                      DateTime.now();
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -748,13 +800,17 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   leading: CircleAvatar(
                     backgroundColor: type == 'quote'
                         ? AppColors.paid(context).withValues(alpha: 0.2)
-                        : Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                        : Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.2),
                     child: Icon(
                       type == 'quote'
                           ? Icons.request_quote
                           : Icons.receipt_long,
-                      color:
-                          type == 'quote' ? AppColors.paid(context) : Theme.of(context).colorScheme.primary,
+                      color: type == 'quote'
+                          ? AppColors.paid(context)
+                          : Theme.of(context).colorScheme.primary,
                       size: 20,
                     ),
                   ),
@@ -768,11 +824,14 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                     '${type.toUpperCase()} \u2022 ${status.toUpperCase()} \u2022 ${DateFormat('MMM d, y').format(createdAt)}',
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
-                    style: AppTextStyles.cardSubtitle(Theme.of(context).textTheme, Theme.of(context).colorScheme),
+                    style: AppTextStyles.cardSubtitle(
+                        Theme.of(context).textTheme,
+                        Theme.of(context).colorScheme),
                   ),
                   trailing: Text(
                     '$curr${total.toStringAsFixed(2)}',
-                    style: AppTextStyles.cardAmount(Theme.of(context).textTheme),
+                    style:
+                        AppTextStyles.cardAmount(Theme.of(context).textTheme),
                   ),
                 ),
               );
@@ -829,8 +888,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         displayRows.sort((a, b) => b.displayDate.compareTo(a.displayDate));
 
         // Calculate total
-        final totalExpenses = displayRows.fold<double>(
-            0.0, (sum, row) => sum + row.totalAmount);
+        final totalExpenses =
+            displayRows.fold<double>(0.0, (sum, row) => sum + row.totalAmount);
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -851,8 +910,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               if (row.isGroup) {
                 return _buildGroupedExpenseRow(context, row, curr);
               } else {
-                return _buildSingleExpenseRow(
-                    context, row.entry!, curr);
+                return _buildSingleExpenseRow(context, row.entry!, curr);
               }
             },
           ),
@@ -936,8 +994,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
 
   // ── Expense summary header ───────────────────────────────────────────────
 
-  Widget _buildExpenseSummaryHeader(BuildContext context, double total,
-      int itemCount, String curr) {
+  Widget _buildExpenseSummaryHeader(
+      BuildContext context, double total, int itemCount, String curr) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -1042,8 +1100,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               child: Text(
                 subtitleParts.join(' \u2022 '),
                 style: AppTextStyles.cardSubtitle(
-                    Theme.of(context).textTheme,
-                    Theme.of(context).colorScheme),
+                    Theme.of(context).textTheme, Theme.of(context).colorScheme),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1051,8 +1108,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             if (badge != null) ...[
               const SizedBox(width: 6),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 5, vertical: 1),
+                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                 decoration: BoxDecoration(
                   color: (badge == 'No receipt' || badge == 'Not invoiced'
                           ? Colors.amber.shade700
@@ -1098,8 +1154,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
     subtitleParts.add('${row.itemCount} items');
 
     final dateLine = dateFormat.format(row.displayDate);
-    final estimatedCount =
-        row.children!.where((c) => c.isEstimated).length;
+    final estimatedCount = row.children!.where((c) => c.isEstimated).length;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -1135,8 +1190,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                     const SizedBox(height: 2),
                     Text(subtitleParts.join(' · '),
                         style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant),
+                            fontSize: 12, color: colorScheme.onSurfaceVariant),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 3),
@@ -1152,8 +1206,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(
-                              color: Colors.amber.shade700
-                                  .withValues(alpha: 0.12),
+                              color:
+                                  Colors.amber.shade700.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -1243,8 +1297,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                         const SizedBox(height: 2),
                         Text(
                           [
-                            if (row.invoiceNumber != null)
-                              row.invoiceNumber!,
+                            if (row.invoiceNumber != null) row.invoiceNumber!,
                             '${row.itemCount} items',
                           ].join(' · '),
                           style: TextStyle(
@@ -1408,8 +1461,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                                 '$cs${row.totalAmount.toStringAsFixed(2)}',
                                 textAlign: TextAlign.end,
                                 style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w800)),
+                                    fontSize: 13, fontWeight: FontWeight.w800)),
                           ),
                         ],
                       ),
@@ -1585,8 +1637,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                 _expDetailRow(
                     Icons.person_outline, 'Client', entry.clientName!),
               if (entry.invoiceNumber != null)
-                _expDetailRow(Icons.receipt_outlined, 'Invoice',
-                    entry.invoiceNumber!),
+                _expDetailRow(
+                    Icons.receipt_outlined, 'Invoice', entry.invoiceNumber!),
               if (cost.provisionalCost != cost.canonicalCost)
                 _expDetailRow(Icons.compare_arrows, 'Invoice estimate',
                     '$cs${cost.provisionalCost.toStringAsFixed(2)}'),
@@ -1603,14 +1655,13 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                         letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: AppColors.paid(context).withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color:
-                            AppColors.paid(context).withValues(alpha: 0.15)),
+                        color: AppColors.paid(context).withValues(alpha: 0.15)),
                   ),
                   child: Row(
                     children: [
@@ -1623,8 +1674,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                                 fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
                       if (receiptAmount != null)
-                        Text(
-                            '$cs${receiptAmount!.toStringAsFixed(2)}',
+                        Text('$cs${receiptAmount!.toStringAsFixed(2)}',
                             style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -1771,8 +1821,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                         color: AppColors.paid(context).withValues(alpha: 0.08),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color:
-                              AppColors.paid(context).withValues(alpha: 0.2),
+                          color: AppColors.paid(context).withValues(alpha: 0.2),
                         ),
                       ),
                       child: Row(
@@ -1826,8 +1875,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => AddExpenseScreen(
-                                  existingExpense: expense),
+                              builder: (_) =>
+                                  AddExpenseScreen(existingExpense: expense),
                             ),
                           ).then((_) {
                             ref.invalidate(costLedgerProvider);
@@ -1902,8 +1951,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               }
             },
             child: Text('Delete',
-                style: TextStyle(
-                    color: Theme.of(context).colorScheme.error)),
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -1918,8 +1966,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         children: [
           Icon(icon,
               size: 18,
-              color: color ??
-                  Theme.of(context).colorScheme.onSurfaceVariant),
+              color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 10),
           Text(label,
               style: TextStyle(
@@ -1928,9 +1975,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           const Spacer(),
           Text(value,
               style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: color)),
+                  fontWeight: FontWeight.w600, fontSize: 13, color: color)),
         ],
       ),
     );
@@ -1945,7 +1990,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
           return _emptyState(
             icon: Icons.note_alt_outlined,
             message: 'No notes yet',
-            subtitle: 'Record measurements, site details,\nor client preferences',
+            subtitle:
+                'Record measurements, site details,\nor client preferences',
             onAction: _openNoteEditor,
             actionLabel: 'Create Note',
           );
@@ -1958,29 +2004,50 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         return Stack(
           children: [
             RefreshIndicator(
-              onRefresh: () async => ref.invalidate(customerNotesProvider(_customerId)),
+              onRefresh: () async =>
+                  ref.invalidate(customerNotesProvider(_customerId)),
               child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-              children: [
-                if (pinned.isNotEmpty) ...[
-                  _noteSectionHeader('Pinned', Icons.push_pin, AppColors.sent(context)),
-                  ...pinned.map(_buildNoteCard),
-                  const SizedBox(height: 12),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                children: [
+                  if (pinned.isNotEmpty) ...[
+                    _noteSectionHeader(
+                        'Pinned', Icons.push_pin, AppColors.sent(context)),
+                    ...pinned.map(_buildNoteCard),
+                    const SizedBox(height: 12),
+                  ],
+                  if (unpinned.isNotEmpty) ...[
+                    if (pinned.isNotEmpty)
+                      _noteSectionHeader('Notes', Icons.note_alt_outlined,
+                          Theme.of(context).colorScheme.onSurfaceVariant),
+                    ...unpinned.map(_buildNoteCard),
+                  ],
                 ],
-                if (unpinned.isNotEmpty) ...[
-                  if (pinned.isNotEmpty)
-                    _noteSectionHeader('Notes', Icons.note_alt_outlined, Theme.of(context).colorScheme.onSurfaceVariant),
-                  ...unpinned.map(_buildNoteCard),
-                ],
-              ],
-            ),
+              ),
             ),
             Positioned(
-              bottom: 16,
-              right: 16,
-              child: FloatingActionButton(
-                onPressed: _openNoteEditor,
-                child: const Icon(Icons.add),
+              bottom: 20,
+              right: 20,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: FloatingActionButton(
+                      heroTag: 'customer_notes_fab',
+                      elevation: 2,
+                      onPressed: _openNoteEditor,
+                      child: const Icon(Icons.note_add),
+                    ),
+                  ),
+                  FloatingActionButton(
+                    heroTag: 'customer_notes_ai_fab',
+                    elevation: 2,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    shape: const CircleBorder(),
+                    onPressed: () => _openAiAssistant(context),
+                    child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
+                  ),
+                ],
               ),
             ),
           ],
@@ -2039,7 +2106,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
+        side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.2)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -2076,7 +2144,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                               fontWeight: FontWeight.w600,
                               color: title.isNotEmpty
                                   ? colorScheme.onSurface
-                                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                                  : colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.4),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -2090,7 +2159,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                           style: TextStyle(
                             fontSize: 13,
                             height: 1.4,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
@@ -2101,12 +2171,15 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                       children: [
                         if (imageUrls.isNotEmpty) ...[
                           Icon(Icons.photo_outlined,
-                              size: 13, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45)),
+                              size: 13,
+                              color: colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.45)),
                           const SizedBox(width: 2),
                           Text('${imageUrls.length}',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.5),
                                 fontWeight: FontWeight.w600,
                               )),
                           const SizedBox(width: 8),
@@ -2116,7 +2189,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                             DateFormat('MMM d, y').format(updatedAt),
                             style: TextStyle(
                               fontSize: 11,
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                              color: colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.5),
                             ),
                           ),
                       ],
@@ -2154,21 +2228,33 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
   List<Map<String, dynamic>> _parseNoteImages(dynamic imagesJson) {
     if (imagesJson == null) return [];
     if (imagesJson is List) {
-      return imagesJson
-          .whereType<Map<String, dynamic>>()
-          .toList();
+      return imagesJson.whereType<Map<String, dynamic>>().toList();
     }
     return [];
   }
 
   Color _parseNoteColor(String? name) {
     switch (name) {
-      case 'green': return AppColors.noteGreen;
-      case 'orange': return AppColors.noteOrange;
-      case 'red': return AppColors.noteRed;
-      case 'purple': return AppColors.notePurple;
-      case 'teal': return AppColors.noteTeal;
-      default: return AppColors.noteBlue;
+      case 'green':
+        return AppColors.noteGreen;
+      case 'orange':
+        return AppColors.noteOrange;
+      case 'red':
+        return AppColors.noteRed;
+      case 'purple':
+        return AppColors.notePurple;
+      case 'teal':
+        return AppColors.noteTeal;
+      default:
+        return AppColors.noteBlue;
+    }
+  }
+
+  Future<void> _openAiAssistant(BuildContext context) async {
+    final notifier = ref.read(aiAssistantProvider.notifier);
+    final result = await showAiAssistantOverlay(context, notifier: notifier);
+    if (result != null && context.mounted) {
+      await ref.read(aiActionCoordinatorProvider).execute(context, result);
     }
   }
 
@@ -2224,8 +2310,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                       ? Icons.push_pin_outlined
                       : Icons.push_pin,
                 ),
-                title: Text(
-                    note['pinned'] == true ? 'Unpin' : 'Pin to top'),
+                title: Text(note['pinned'] == true ? 'Unpin' : 'Pin to top'),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 onTap: () async {
@@ -2235,8 +2320,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                     await supabase.ensureValidSession();
                     await supabase.client
                         .from('project_notes')
-                        .update({'pinned': !(note['pinned'] == true)})
-                        .eq('id', note['id']);
+                        .update({'pinned': !(note['pinned'] == true)}).eq(
+                            'id', note['id']);
                     ref.invalidate(customerNotesProvider(_customerId));
                   } catch (e) {
                     debugPrint('Note pin toggle failed: $e');
@@ -2244,10 +2329,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                 },
               ),
               ListTile(
-                leading:
-                    const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Delete',
-                    style: TextStyle(color: Colors.red)),
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title:
+                    const Text('Delete', style: TextStyle(color: Colors.red)),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
                 onTap: () {
@@ -2267,8 +2351,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Note?'),
-        content: Text(
-            'Delete "${note['title']}"? This cannot be undone.'),
+        content: Text('Delete "${note['title']}"? This cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -2289,14 +2372,14 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                        content: Text('Could not delete note. Please try again.'),
+                        content:
+                            Text('Could not delete note. Please try again.'),
                         backgroundColor: Colors.red),
                   );
                 }
               }
             },
-            child:
-                const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -2332,7 +2415,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
               icon: const Icon(Icons.add, size: 18),
               label: Text(actionLabel ?? 'Create'),
               style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               ),
             ),
           ],
@@ -2345,7 +2429,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
     final nameCtrl = TextEditingController(text: _customerData['name'] ?? '');
     final phoneCtrl = TextEditingController(text: _customerData['phone'] ?? '');
     final emailCtrl = TextEditingController(text: _customerData['email'] ?? '');
-    final addressCtrl = TextEditingController(text: _customerData['address'] ?? '');
+    final addressCtrl =
+        TextEditingController(text: _customerData['address'] ?? '');
     String? nameError;
     String? emailError;
 
@@ -2367,7 +2452,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                     errorText: nameError,
                   ),
                   onChanged: (_) {
-                    if (nameError != null) setDialogState(() => nameError = null);
+                    if (nameError != null)
+                      setDialogState(() => nameError = null);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -2389,7 +2475,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                     errorText: emailError,
                   ),
                   onChanged: (_) {
-                    if (emailError != null) setDialogState(() => emailError = null);
+                    if (emailError != null)
+                      setDialogState(() => emailError = null);
                   },
                 ),
                 const SizedBox(height: 12),
@@ -2418,13 +2505,15 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   return;
                 }
                 if (name.length < 2) {
-                  setDialogState(() => nameError = 'Name must be at least 2 characters');
+                  setDialogState(
+                      () => nameError = 'Name must be at least 2 characters');
                   return;
                 }
                 final email = emailCtrl.text.trim();
                 if (email.isNotEmpty &&
                     !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-                  setDialogState(() => emailError = 'Enter a valid email address');
+                  setDialogState(
+                      () => emailError = 'Enter a valid email address');
                   return;
                 }
 
@@ -2433,9 +2522,13 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   await supabase.ensureValidSession();
                   final updates = <String, dynamic>{
                     'name': name,
-                    'phone': phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                    'phone': phoneCtrl.text.trim().isEmpty
+                        ? null
+                        : phoneCtrl.text.trim(),
                     'email': email.isEmpty ? null : email,
-                    'address': addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
+                    'address': addressCtrl.text.trim().isEmpty
+                        ? null
+                        : addressCtrl.text.trim(),
                     'updated_at': DateTime.now().toIso8601String(),
                   };
 
@@ -2466,7 +2559,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       const SnackBar(
-                        content: Text('Could not update client. Please try again.'),
+                        content:
+                            Text('Could not update client. Please try again.'),
                         backgroundColor: Colors.red,
                       ),
                     );
@@ -2551,8 +2645,8 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     SnackBar(
                         content: Text(
-                          'Failed to create project. Please run the latest '
-                          'database migration and try again.'),
+                            'Failed to create project. Please run the latest '
+                            'database migration and try again.'),
                         backgroundColor: Colors.red),
                   );
                 }
@@ -2579,7 +2673,9 @@ class _CustomerDisplayRow {
 
   DateTime get displayDate {
     if (isGroup) {
-      return children!.map((c) => c.date).reduce((a, b) => a.isAfter(b) ? a : b);
+      return children!
+          .map((c) => c.date)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
     }
     return entry!.date;
   }
@@ -2595,8 +2691,7 @@ class _CustomerDisplayRow {
       isGroup ? children!.first.invoiceNumber : entry!.invoiceNumber;
   String? get clientName =>
       isGroup ? children!.first.clientName : entry!.clientName;
-  String? get jobName =>
-      isGroup ? children!.first.jobName : entry!.jobName;
+  String? get jobName => isGroup ? children!.first.jobName : entry!.jobName;
   String? get jobId => isGroup ? children!.first.jobId : entry!.jobId;
   int get itemCount => isGroup ? children!.length : 1;
 }

@@ -10,6 +10,9 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../data/services/supabase_service.dart';
+import '../../../data/services/voice_capture_service.dart';
+import '../../../data/repositories/voice_repository.dart';
+import '../../../core/utils/connectivity_service.dart';
 import '../../providers/customer_ledger_provider.dart';
 import 'block_editor/note_block.dart';
 
@@ -44,6 +47,8 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
   final String customerName;
   final String? projectId;
   final String? projectName;
+  final String? initialTitle;
+  final String? initialContent;
 
   const NoteEditorScreen({
     super.key,
@@ -52,6 +57,8 @@ class NoteEditorScreen extends ConsumerStatefulWidget {
     required this.customerName,
     this.projectId,
     this.projectName,
+    this.initialTitle,
+    this.initialContent,
   });
 
   @override
@@ -68,6 +75,8 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   String _selectedColor = 'blue';
   bool _pinned = false;
+  bool _isRecordingVoice = false;
+  VoiceCaptureService? _voiceService;
   bool _isSaving = false;
   bool _hasUnsavedChanges = false;
   Timer? _autoSaveTimer;
@@ -94,13 +103,15 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   void initState() {
     super.initState();
     final note = widget.existingNote;
-    _titleCtrl = TextEditingController(text: note?['title']?.toString() ?? '');
+    _titleCtrl = TextEditingController(
+      text: note?['title']?.toString() ?? widget.initialTitle ?? '',
+    );
     _selectedColor = note?['color']?.toString() ?? 'blue';
     _pinned = note?['pinned'] == true;
     _noteId = note?['id']?.toString();
 
     // Parse content into blocks
-    final content = note?['content']?.toString();
+    final content = note?['content']?.toString() ?? widget.initialContent;
     final legacyImages = note?['images'];
     _blocks = parseNoteContent(content, legacyImages is List ? legacyImages : null);
 
@@ -113,6 +124,7 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   @override
   void dispose() {
     _autoSaveTimer?.cancel();
+    _voiceService?.dispose();
     _titleCtrl.dispose();
     _titleFocus.dispose();
     _scrollController.dispose();
@@ -501,6 +513,66 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
   }
 
   /// Insert image(s) at the current focus position.
+  /// Record voice and insert transcribed text as a new paragraph block.
+  Future<void> _voiceDictate() async {
+    if (_isRecordingVoice) {
+      // Stop recording and process
+      try {
+        setState(() => _isRecordingVoice = false);
+        final result = await _voiceService!.stopAndProcess();
+        final transcript = result.transcript.trim();
+        if (transcript.isNotEmpty && mounted) {
+          // Insert transcript as a new paragraph block at the end
+          final newBlock = NoteBlock(
+            id: const Uuid().v4(),
+            type: NoteBlockType.paragraph,
+            text: transcript,
+          );
+          setState(() {
+            _blocks.add(newBlock);
+          });
+          _markDirty();
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Voice note added'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isRecordingVoice = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Voice capture failed. Try again.'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    } else {
+      // Start recording
+      try {
+        _voiceService ??= VoiceCaptureService(
+          ref.read(voiceRepositoryProvider),
+          ConnectivityService.instance,
+        );
+        await _voiceService!.startRecording();
+        if (mounted) setState(() => _isRecordingVoice = true);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Could not start recording'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Future<void> _pickImages(ImageSource source) async {
     try {
       // Find focused block index
@@ -1477,34 +1549,43 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               // Formatting tools
               _toolbarBtn(Icons.checklist_rounded, 'Checklist',
                   () => _insertBlockType(NoteBlockType.checklist), iconColor),
-              const SizedBox(width: 4),
               _toolbarBtn(Icons.format_list_bulleted_rounded, 'Bullets',
                   () => _insertBlockType(NoteBlockType.bullet), iconColor),
-              const SizedBox(width: 4),
               _toolbarBtn(Icons.format_list_numbered_rounded, 'Numbered',
                   () => _insertBlockType(NoteBlockType.numbered), iconColor),
-              const SizedBox(width: 4),
               _toolbarBtn(Icons.title_rounded, 'Heading',
                   () => _insertBlockType(NoteBlockType.heading), iconColor),
 
               // Separator
               Container(
                 width: 1, height: 20,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
                 color: colorScheme.outlineVariant.withValues(alpha: 0.12),
               ),
 
               // Media
               _toolbarBtn(Icons.camera_alt_rounded, 'Camera',
                   () => _pickImages(ImageSource.camera), iconColor),
-              const SizedBox(width: 4),
               _toolbarBtn(Icons.photo_library_rounded, 'Photos',
                   () => _pickImages(ImageSource.gallery), iconColor),
+
+              // Separator
+              Container(
+                width: 1, height: 20,
+                color: colorScheme.outlineVariant.withValues(alpha: 0.12),
+              ),
+
+              // Voice dictation
+              _toolbarBtn(
+                _isRecordingVoice ? Icons.stop_rounded : Icons.mic_rounded,
+                _isRecordingVoice ? 'Stop' : 'Dictate',
+                _voiceDictate,
+                _isRecordingVoice ? colorScheme.error : colorScheme.primary,
+              ),
             ],
           ),
         ),
@@ -1514,12 +1595,12 @@ class _NoteEditorScreenState extends ConsumerState<NoteEditorScreen> {
 
   Widget _toolbarBtn(IconData icon, String tooltip, VoidCallback onTap, Color color) {
     return IconButton(
-      icon: Icon(icon, size: 22, color: color),
+      icon: Icon(icon, size: 20, color: color),
       tooltip: tooltip,
       onPressed: onTap,
-      padding: const EdgeInsets.all(10),
-      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-      splashRadius: 22,
+      padding: const EdgeInsets.all(8),
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      splashRadius: 20,
     );
   }
 }

@@ -102,7 +102,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                             ),
                           );
                         },
-                        child: const Icon(Icons.add),
+                        child: const Icon(Icons.post_add),
                       ),
                     ),
                   if (selectedIndex == 3) // Clients
