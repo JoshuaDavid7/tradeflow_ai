@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../data/services/supabase_service.dart';
 import '../../../screens/draft_review_screen.dart';
 import 'note_editor_screen.dart';
@@ -74,6 +75,8 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 );
               } else if (value == 'note') {
                 _openNoteEditor();
+              } else if (value == 'delete') {
+                _confirmDeleteProject();
               }
             },
             itemBuilder: (_) => [
@@ -98,6 +101,18 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                 child: ListTile(
                   leading: Icon(Icons.note_add),
                   title: Text('Add Note'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline,
+                      color: Theme.of(context).colorScheme.error),
+                  title: Text('Delete Project',
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.error)),
                   contentPadding: EdgeInsets.zero,
                 ),
               ),
@@ -280,6 +295,63 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
   }
 
   // ─── Note Editor Navigation ─────────────────────────────────────────────
+
+  Future<void> _confirmDeleteProject() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Project?'),
+        content: Text(
+          'This will permanently delete "$_projectName" and all its notes. '
+          'Linked invoices and quotes will not be affected.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      final projectId = widget.project['id']?.toString();
+      if (projectId == null) return;
+
+      final supabase = Supabase.instance.client;
+      // Delete project notes first
+      await supabase
+          .from('project_notes')
+          .delete()
+          .eq('project_id', projectId);
+      // Delete the project
+      await supabase.from('projects').delete().eq('id', projectId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Project deleted')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to delete project'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
 
   void _openNoteEditor({Map<String, dynamic>? existingNote}) {
     Navigator.push(
