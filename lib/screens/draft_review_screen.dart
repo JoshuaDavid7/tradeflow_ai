@@ -359,6 +359,28 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     return '$prefix-${id.substring(0, 6).toUpperCase()}';
   }
 
+  /// Swap the invoice/quote number prefix when the user toggles document type.
+  void _updateDocumentNumberPrefix() {
+    final current = _invoiceNumberCtrl.text.trim();
+    if (current.isEmpty || _invoiceNumberEditedByUser) return;
+
+    final isQuote = (_editableData['type']?.toString() ?? 'invoice') == 'quote';
+    final invPrefix = _profile?.invoicePrefix ?? 'INV';
+    final quoPrefix = _profile?.quotePrefix ?? 'QUO';
+
+    // Try to swap the prefix in the existing number
+    if (isQuote && current.startsWith(invPrefix)) {
+      _invoiceNumberCtrl.text =
+          current.replaceFirst(invPrefix, quoPrefix);
+    } else if (!isQuote && current.startsWith(quoPrefix)) {
+      _invoiceNumberCtrl.text =
+          current.replaceFirst(quoPrefix, invPrefix);
+    }
+
+    _editableData['invoiceNumber'] = _invoiceNumberCtrl.text;
+    _editableData['invoice_number'] = _invoiceNumberCtrl.text;
+  }
+
   Future<void> _primeInvoiceNumberPreview() async {
     final hasExistingJobId =
         (_editableData['id']?.toString().trim().isNotEmpty ?? false);
@@ -2361,6 +2383,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
             setState(() {
               _editableData['type'] = value;
               _isDirty = true;
+              // Update invoice/quote number prefix when type changes
+              _updateDocumentNumberPrefix();
             });
           }
         },
@@ -2503,7 +2527,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   key: const ValueKey('client_name_field'),
                   controller: _clientCtrl,
                   onChanged: (_) => _autoMatchCustomer(),
-                  decoration: _denseDecoration('Client Name',
+                  decoration: _denseDecoration('Client / Business Name',
                       suffixIcon: isLinked
                           ? Tooltip(
                               message: 'Linked to client ledger',

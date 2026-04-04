@@ -360,13 +360,13 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
             ),
           ),
           const SizedBox(height: 8),
-          // Bottom row: Collected, Spent, Profit
+          // Bottom row: Gross Income, Expenses, Net Income
           analyticsAsync.when(
             data: (analytics) => Row(
               children: [
                 _buildMiniMetric(
                   context,
-                  label: 'Collected',
+                  label: 'Gross Income',
                   value:
                       '$currencySymbol${analytics.monthlyRevenue.toStringAsFixed(0)}',
                   color: Colors.white,
@@ -374,7 +374,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                 _buildMetricDivider(),
                 _buildMiniMetric(
                   context,
-                  label: 'Spent',
+                  label: 'Expenses',
                   value:
                       '$currencySymbol${analytics.monthlyExpenses.toStringAsFixed(0)}',
                   color: Colors.white.withValues(alpha: 0.8),
@@ -382,7 +382,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                 _buildMetricDivider(),
                 _buildMiniMetric(
                   context,
-                  label: 'Profit',
+                  label: 'Net Income',
                   value:
                       '$currencySymbol${analytics.monthlyProfit.toStringAsFixed(0)}',
                   color: analytics.monthlyProfit >= 0
@@ -394,30 +394,30 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
             loading: () => Row(
               children: [
                 _buildMiniMetric(context,
-                    label: 'Collected', value: '\u2014', color: Colors.white),
+                    label: 'Gross Income', value: '\u2014', color: Colors.white),
                 _buildMetricDivider(),
                 _buildMiniMetric(context,
-                    label: 'Spent', value: '\u2014', color: Colors.white),
+                    label: 'Expenses', value: '\u2014', color: Colors.white),
                 _buildMetricDivider(),
                 _buildMiniMetric(context,
-                    label: 'Profit', value: '\u2014', color: Colors.white),
+                    label: 'Net Income', value: '\u2014', color: Colors.white),
               ],
             ),
             error: (_, __) => Row(
               children: [
                 _buildMiniMetric(
                   context,
-                  label: 'Collected',
+                  label: 'Gross Income',
                   value:
                       '$currencySymbol${((jobStats['monthlyRevenue'] as double?) ?? 0.0).toStringAsFixed(0)}',
                   color: Colors.white,
                 ),
                 _buildMetricDivider(),
                 _buildMiniMetric(context,
-                    label: 'Spent', value: '\u2014', color: Colors.white),
+                    label: 'Expenses', value: '\u2014', color: Colors.white),
                 _buildMetricDivider(),
                 _buildMiniMetric(context,
-                    label: 'Profit', value: '\u2014', color: Colors.white),
+                    label: 'Net Income', value: '\u2014', color: Colors.white),
               ],
             ),
           ),
@@ -954,7 +954,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
               autofocus: true,
               textCapitalization: TextCapitalization.words,
               decoration: InputDecoration(
-                labelText: 'Client name',
+                labelText: 'Client / Business name',
                 prefixIcon: const Icon(Icons.person_outline),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),

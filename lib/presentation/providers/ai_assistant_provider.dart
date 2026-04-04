@@ -5,11 +5,11 @@ import '../../data/services/voice_capture_service.dart';
 import '../../data/repositories/voice_repository.dart';
 import '../../core/utils/connectivity_service.dart';
 import '../../core/errors/error_handler.dart';
-import '../screens/main_shell_screen.dart' show bottomNavIndexProvider;
 import 'profile_provider.dart';
 import 'job_provider.dart';
 import 'expense_provider.dart';
 import 'customer_ledger_provider.dart';
+import 'navigation_provider.dart';
 
 /// State for the global AI assistant.
 enum AiAssistantStatus { idle, recording, processing, done, error }
@@ -53,7 +53,15 @@ final aiVoiceCaptureServiceProvider = Provider<VoiceCaptureService>((ref) {
 });
 
 /// The main AI assistant state notifier.
-class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
+abstract class AiAssistantController {
+  Future<void> startRecording();
+  Future<AiCommandResult?> stopAndProcess();
+  Future<void> cancel();
+  void reset();
+}
+
+class AiAssistantNotifier extends StateNotifier<AiAssistantState>
+    implements AiAssistantController {
   final VoiceCaptureService _voiceService;
   final AiCommandService _commandService;
   final Ref _ref;
@@ -76,6 +84,7 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
   }
 
   /// Start voice recording.
+  @override
   Future<void> startRecording() async {
     try {
       state = const AiAssistantState(
@@ -85,7 +94,7 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
       await _voiceService.startRecording();
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);
-      state = AiAssistantState(
+      state = const AiAssistantState(
         status: AiAssistantStatus.error,
         statusMessage: 'Could not start recording',
       );
@@ -93,6 +102,7 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
   }
 
   /// Stop recording, transcribe, and process with global AI.
+  @override
   Future<AiCommandResult?> stopAndProcess() async {
     try {
       state = state.copyWith(
@@ -106,15 +116,23 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
       // However, the pipeline is monolithic. We'll use stopAndProcess
       // which does extraction too, but we only need the transcript.
       // Let's just run the pipeline and ignore the extraction result.
-      final voiceResult = await _voiceService.stopAndProcess();
-      if (voiceResult == null) {
-        state = AiAssistantState(
-          status: AiAssistantStatus.error,
-          statusMessage: 'Could not process audio',
-        );
-        return null;
-      }
+      final voiceResult = await _voiceService.stopAndProcess(
+        extractJobData: false,
+      );
 
+      return processTranscript(voiceResult.transcript);
+    } catch (error, stackTrace) {
+      ErrorHandler.handle(error, stackTrace);
+      state = const AiAssistantState(
+        status: AiAssistantStatus.error,
+        statusMessage: 'Something went wrong. Please try again.',
+      );
+      return null;
+    }
+  }
+
+  Future<AiCommandResult?> processTranscript(String transcript) async {
+    try {
       state = state.copyWith(
         statusMessage: 'Thinking...',
       );
@@ -124,20 +142,27 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
 
       // Send transcript to global AI command processor
       final result = await _commandService.processCommand(
-        voiceResult.transcript,
+        transcript,
         context: context,
+      );
+
+      final enrichedResult = AiCommandResult(
+        action: result.action,
+        params: result.params,
+        response: result.response,
+        transcript: transcript,
       );
 
       state = AiAssistantState(
         status: AiAssistantStatus.done,
-        lastResult: result,
-        statusMessage: result.response,
+        lastResult: enrichedResult,
+        statusMessage: enrichedResult.response,
       );
 
-      return result;
+      return enrichedResult;
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);
-      state = AiAssistantState(
+      state = const AiAssistantState(
         status: AiAssistantStatus.error,
         statusMessage: 'Something went wrong. Please try again.',
       );
@@ -146,12 +171,14 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
   }
 
   /// Cancel current recording.
+  @override
   Future<void> cancel() async {
     await _voiceService.cancel();
     state = const AiAssistantState();
   }
 
   /// Reset to idle.
+  @override
   void reset() {
     state = const AiAssistantState();
   }
@@ -170,13 +197,26 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
       // Get customer names
       final customers = _ref.read(customerLedgerListProvider);
       final customerNames = customers.whenOrNull(
-        data: (list) =>
-            list.map((c) => c['name']?.toString() ?? '').where((n) => n.isNotEmpty).toList(),
+        data: (list) => list
+            .map((c) => c['name']?.toString() ?? '')
+            .where((n) => n.isNotEmpty)
+            .toList(),
       );
 
       // Get expense stats
       final expenseStats = _ref.read(expenseStatsProvider);
       final expenses = expenseStats.whenOrNull(data: (e) => e);
+      final jobs = _ref.read(jobListProvider).jobs;
+      final summarizedJobs = jobs
+          .map((job) => {
+                'title': job.title,
+                'clientName': job.clientName,
+                'status': job.status.name,
+                'type': job.type.name,
+                'amountDue': job.amountDue,
+              })
+          .take(20)
+          .toList();
 
       return {
         'currentScreen': _getCurrentScreenName(),
@@ -188,8 +228,7 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
           'monthlyCollected': stats?['monthlyCollected'] ?? 0,
           'monthlyRevenue': stats?['monthlyRevenue'] ?? 0,
           'monthlyExpenses': expenses?['monthlyTotal'] ?? 0,
-          'monthlyProfit':
-              ((stats?['monthlyRevenue'] ?? 0) as num) -
+          'monthlyProfit': ((stats?['monthlyRevenue'] ?? 0) as num) -
               ((expenses?['monthlyTotal'] ?? 0) as num),
         },
         'profile': {
@@ -199,6 +238,7 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
           'currency': profileData?.currencySymbol ?? '\$',
         },
         'recentCustomers': customerNames ?? [],
+        'jobs': summarizedJobs,
       };
     } catch (e) {
       ErrorHandler.warning('Failed to build AI context', {'error': e});
@@ -207,6 +247,7 @@ class AiAssistantNotifier extends StateNotifier<AiAssistantState> {
         'stats': {},
         'profile': {},
         'recentCustomers': [],
+        'jobs': const [],
       };
     }
   }

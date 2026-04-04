@@ -53,3 +53,10 @@ app.*.map.json
 
 # Local database
 *.db
+
+# Temp debug files
+tmp/
+tool/live_voice_smoke.py
+tool/marionette_smoke.dart
+tool/voice_stress_report.json
+tool/voice_stress_suite.py

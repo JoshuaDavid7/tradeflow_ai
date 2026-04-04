@@ -6,18 +6,24 @@ class AiCommandResult {
   final String action;
   final Map<String, dynamic> params;
   final String response;
+  final String? transcript;
 
   const AiCommandResult({
     required this.action,
     required this.params,
     required this.response,
+    this.transcript,
   });
 
   factory AiCommandResult.fromJson(Map<String, dynamic> json) {
+    final rawParams = json['params'];
     return AiCommandResult(
       action: json['action']?.toString() ?? 'answer',
-      params: (json['params'] as Map<String, dynamic>?) ?? {},
+      params: rawParams is Map
+          ? Map<String, dynamic>.from(rawParams)
+          : const <String, dynamic>{},
       response: json['response']?.toString() ?? 'Done.',
+      transcript: json['transcript']?.toString(),
     );
   }
 

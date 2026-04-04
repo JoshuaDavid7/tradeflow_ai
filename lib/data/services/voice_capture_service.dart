@@ -199,10 +199,16 @@ class VoiceCaptureService {
     });
   }
 
-  /// Stop recording and process with full pipeline.
+  /// Stop recording and process the captured audio.
+  ///
+  /// When [extractJobData] is false, the service stops after transcription.
   /// Pass [invoiceContext] when refining an existing invoice — the AI will see
   /// the current document state and return the complete updated version.
-  Future<VoiceCaptureResult> stopAndProcess({Map<String, dynamic>? invoiceContext}) async {
+  Future<VoiceCaptureResult> stopAndProcess({
+    Map<String, dynamic>? invoiceContext,
+    bool extractJobData = true,
+    List<String>? knownCustomers,
+  }) async {
     File? recordedFile;
 
     try {
@@ -243,7 +249,7 @@ class VoiceCaptureService {
             (recordingDuration.inMilliseconds / 1000).toStringAsFixed(1);
         final message = recordingDuration < _minimumRecordingDuration
             ? 'Recording was stopped too quickly (${durationSeconds}s). '
-                'Please speak for at least 2 seconds before tapping stop.'
+                'Please speak for at least 1 second before tapping stop.'
             : 'Recording did not capture usable audio ($fileSize bytes after waiting). '
                 'Please make sure the microphone is available and try again.';
         throw VoiceCaptureException(
@@ -285,27 +291,34 @@ class VoiceCaptureService {
 
       final transcript = await _transcribeWithRetry(storagePath);
 
-      // Extract job data with progress
-      _updateProgress(
-        const VoiceCaptureProgress(
-          state: VoiceCaptureState.extracting,
-          progress: 0.8,
-          message: 'Extracting job details...',
-        ),
-      );
-
       Map<String, dynamic> extractedData;
-      try {
-        extractedData = await _extractWithRetry(transcript, invoiceContext);
-      } catch (error) {
-        ErrorHandler.warning(
-          'Voice extraction failed, using transcript fallback',
-          {
-            'error': error.toString(),
-            'transcriptLength': transcript.length,
-          },
+      if (extractJobData) {
+        _updateProgress(
+          const VoiceCaptureProgress(
+            state: VoiceCaptureState.extracting,
+            progress: 0.8,
+            message: 'Extracting job details...',
+          ),
         );
-        extractedData = _buildFallbackDraftFromTranscript(transcript);
+
+        try {
+          extractedData = await _extractWithRetry(
+            transcript,
+            invoiceContext,
+            knownCustomers,
+          );
+        } catch (error) {
+          ErrorHandler.warning(
+            'Voice extraction failed, using transcript fallback',
+            {
+              'error': error.toString(),
+              'transcriptLength': transcript.length,
+            },
+          );
+          extractedData = _buildFallbackDraftFromTranscript(transcript);
+        }
+      } else {
+        extractedData = const <String, dynamic>{};
       }
 
       // Cleanup
@@ -316,10 +329,12 @@ class VoiceCaptureService {
         VoiceCaptureProgress(
           state: VoiceCaptureState.completed,
           progress: 1.0,
-          message: extractedData['materials'] is List &&
-                  (extractedData['materials'] as List).isEmpty
-              ? 'Transcript ready. Review the draft details.'
-              : 'Job details extracted successfully!',
+          message: extractJobData
+              ? extractedData['materials'] is List &&
+                      (extractedData['materials'] as List).isEmpty
+                  ? 'Transcript ready. Review the draft details.'
+                  : 'Job details extracted successfully!'
+              : 'Transcript ready.',
         ),
       );
 
@@ -454,7 +469,8 @@ class VoiceCaptureService {
   Future<String> _transcribeWithRetry(String storagePath) async {
     return RetryUtil.retry(
       () => _repository.transcribeAudio(storagePath),
-      config: const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
+      config:
+          const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
       onRetry: (attempt, error) {
         _updateProgress(
           VoiceCaptureProgress(
@@ -468,10 +484,19 @@ class VoiceCaptureService {
   }
 
   /// Extract job data with retry logic
-  Future<Map<String, dynamic>> _extractWithRetry(String transcript, [Map<String, dynamic>? invoiceContext]) async {
+  Future<Map<String, dynamic>> _extractWithRetry(
+    String transcript, [
+    Map<String, dynamic>? invoiceContext,
+    List<String>? knownCustomers,
+  ]) async {
     return RetryUtil.retry(
-      () => _repository.extractJobData(transcript, currentState: invoiceContext),
-      config: const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
+      () => _repository.extractJobData(
+        transcript,
+        currentState: invoiceContext,
+        knownCustomers: knownCustomers,
+      ),
+      config:
+          const RetryConfig(maxAttempts: 2, initialDelay: Duration(seconds: 1)),
       onRetry: (attempt, error) {
         _updateProgress(
           VoiceCaptureProgress(

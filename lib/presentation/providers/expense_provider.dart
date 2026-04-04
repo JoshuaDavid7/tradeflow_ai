@@ -48,7 +48,7 @@ class ExpenseListNotifier extends StateNotifier<ExpenseListState> {
   ExpenseListNotifier(this._repository, this._userId)
       : super(const ExpenseListState()) {
     if (_userId != null) {
-      loadExpenses();
+      Future<void>(loadExpenses);
     }
   }
 

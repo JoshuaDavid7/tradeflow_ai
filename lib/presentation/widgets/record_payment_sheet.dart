@@ -9,6 +9,7 @@ import '../providers/profile_provider.dart';
 /// Payment method options for the dropdown.
 const _paymentMethods = <(String key, String label, IconData icon)>[
   ('cash', 'Cash', Icons.money),
+  ('card', 'Card', Icons.credit_card),
   ('check', 'Check', Icons.receipt_long),
   ('zelle', 'Zelle', Icons.send),
   ('venmo', 'Venmo', Icons.phone_iphone),
@@ -29,6 +30,8 @@ Future<bool?> showRecordPaymentSheet(
   required double totalAmount,
   required double amountPaid,
   required String clientName,
+  double? initialAmount,
+  String? initialMethod,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -43,6 +46,8 @@ Future<bool?> showRecordPaymentSheet(
         totalAmount: totalAmount,
         amountPaid: amountPaid,
         clientName: clientName,
+        initialAmount: initialAmount,
+        initialMethod: initialMethod,
       ),
     ),
   );
@@ -57,6 +62,8 @@ class RecordPaymentSheet extends ConsumerStatefulWidget {
   final double totalAmount;
   final double amountPaid;
   final String clientName;
+  final double? initialAmount;
+  final String? initialMethod;
 
   const RecordPaymentSheet({
     super.key,
@@ -64,6 +71,8 @@ class RecordPaymentSheet extends ConsumerStatefulWidget {
     required this.totalAmount,
     required this.amountPaid,
     required this.clientName,
+    this.initialAmount,
+    this.initialMethod,
   });
 
   @override
@@ -98,9 +107,20 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
   @override
   void initState() {
     super.initState();
+    final requestedAmount = widget.initialAmount ?? _remainingBalance;
+    final safeAmount =
+        requestedAmount.clamp(0.0, _remainingBalance).toDouble();
     _amountController = TextEditingController(
-      text: _remainingBalance.toStringAsFixed(2),
+      text: safeAmount > 0
+          ? safeAmount.toStringAsFixed(2)
+          : _remainingBalance.toStringAsFixed(2),
     );
+    final requestedMethod =
+        (widget.initialMethod ?? '').trim().toLowerCase();
+    final supportedMethods = _paymentMethods.map((entry) => entry.$1).toSet();
+    if (supportedMethods.contains(requestedMethod)) {
+      _selectedMethod = requestedMethod;
+    }
     _amountController.addListener(() => setState(() {}));
   }
 

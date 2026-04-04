@@ -75,15 +75,17 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
     return Scaffold(
       backgroundColor: colorScheme.surface,
       appBar: AppBar(
-        title: Text('Notes', style: TextStyle(
-          fontWeight: FontWeight.w700,
-          fontSize: 18,
-          letterSpacing: -0.3,
-        )),
+        title: Text('Notes',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              letterSpacing: -0.3,
+            )),
         elevation: 0,
         scrolledUnderElevation: 0,
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'project_notes_fab',
         onPressed: () => _openNoteEditor(),
         elevation: 2,
         shape: const CircleBorder(),
@@ -102,7 +104,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                     decoration: InputDecoration(
                       hintText: 'Search notes…',
                       prefixIcon: Icon(Icons.search,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+                          color: colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.5)),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.close, size: 18),
@@ -113,7 +116,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                             )
                           : null,
                       filled: true,
-                      fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                      fillColor: colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.4),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide.none,
@@ -135,7 +139,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                             children: [
                               // Pinned section
                               if (pinned.isNotEmpty) ...[
-                                _buildSectionHeader('Pinned', Icons.push_pin_rounded),
+                                _buildSectionHeader(
+                                    'Pinned', Icons.push_pin_rounded),
                                 ...pinned.map((n) => _noteCard(n)),
                                 if (unpinned.isNotEmpty)
                                   const SizedBox(height: 12),
@@ -177,7 +182,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
     final title = note['title']?.toString() ?? '';
     final content = note['content']?.toString() ?? '';
     final color = _parseColor(note['color']?.toString());
-    final updatedAt = DateTime.tryParse(note['updated_at']?.toString() ?? '') ?? DateTime.now();
+    final updatedAt = DateTime.tryParse(note['updated_at']?.toString() ?? '') ??
+        DateTime.now();
     final pinned = note['pinned'] == true;
 
     // Use block-aware preview
@@ -241,7 +247,9 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                       children: [
                         if (pinned) ...[
                           Icon(Icons.push_pin_rounded,
-                              size: 11, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4)),
+                              size: 11,
+                              color: colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.4)),
                           const SizedBox(width: 4),
                         ],
                         Expanded(
@@ -255,7 +263,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                               letterSpacing: -0.2,
                               color: title.isNotEmpty
                                   ? colorScheme.onSurface
-                                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                                  : colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.35),
                             ),
                           ),
                         ),
@@ -264,7 +273,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                           dateStr,
                           style: TextStyle(
                             fontSize: 12,
-                            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.35),
                             fontWeight: FontWeight.w400,
                           ),
                         ),
@@ -281,7 +291,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                         style: TextStyle(
                           fontSize: 13.5,
                           height: 1.4,
-                          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.55),
+                          color: colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.55),
                           letterSpacing: -0.1,
                         ),
                       ),
@@ -293,26 +304,32 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                       Row(
                         children: [
                           if (hasImages) ...[
-                            Icon(Icons.photo_outlined, size: 12,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                            Icon(Icons.photo_outlined,
+                                size: 12,
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.3)),
                             const SizedBox(width: 3),
                             Text('${imageUrls.length}',
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.35),
                                   fontWeight: FontWeight.w500,
                                 )),
                           ],
                           if (hasImages && checklistInfo != null)
                             const SizedBox(width: 10),
                           if (checklistInfo != null) ...[
-                            Icon(Icons.check_circle_outline_rounded, size: 12,
-                                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.3)),
+                            Icon(Icons.check_circle_outline_rounded,
+                                size: 12,
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.3)),
                             const SizedBox(width: 3),
                             Text(checklistInfo,
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                                  color: colorScheme.onSurfaceVariant
+                                      .withValues(alpha: 0.35),
                                   fontWeight: FontWeight.w500,
                                 )),
                           ],
@@ -356,7 +373,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
       final trimmed = content.trim();
       if (trimmed.startsWith('{') && trimmed.contains('"v"')) {
         final blocks = parseNoteContent(content, null);
-        final checklists = blocks.where((b) => b.type == NoteBlockType.checklist).toList();
+        final checklists =
+            blocks.where((b) => b.type == NoteBlockType.checklist).toList();
         if (checklists.isEmpty) return null;
         final checked = checklists.where((b) => b.checked).length;
         return '$checked/${checklists.length}';
@@ -380,7 +398,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.note_alt_outlined, size: 44,
+            Icon(Icons.note_alt_outlined,
+                size: 44,
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.15)),
             const SizedBox(height: 16),
             Text(
@@ -439,7 +458,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
               // Handle
               Center(
                 child: Container(
-                  width: 36, height: 4,
+                  width: 36,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
@@ -450,7 +470,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
                 title: const Text('Edit'),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _openNoteEditor(existingNote: note);
@@ -463,7 +484,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
                       : Icons.push_pin_rounded,
                 ),
                 title: Text(note['pinned'] == true ? 'Unpin' : 'Pin to top'),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await _togglePin(note);
@@ -471,8 +493,10 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Delete', style: TextStyle(color: Colors.red)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                title:
+                    const Text('Delete', style: TextStyle(color: Colors.red)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
                 onTap: () {
                   Navigator.pop(ctx);
                   _confirmDelete(note);
@@ -490,8 +514,7 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
       final newPinned = !(note['pinned'] == true);
       await _supabase
           .from('project_notes')
-          .update({'pinned': newPinned})
-          .eq('id', note['id']);
+          .update({'pinned': newPinned}).eq('id', note['id']);
       await _fetchNotes();
     } catch (e) {
       debugPrint('Toggle pin failed: $e');
@@ -516,8 +539,8 @@ class _ProjectNotesScreenState extends State<ProjectNotesScreen> {
               Navigator.pop(ctx);
               try {
                 // Delete images from storage
-                final blocks = parseNoteContent(
-                    note['content']?.toString(), null);
+                final blocks =
+                    parseNoteContent(note['content']?.toString(), null);
                 final paths = blocks
                     .where((b) => b.storagePath != null)
                     .map((b) => b.storagePath!)

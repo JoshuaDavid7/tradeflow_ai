@@ -36,7 +36,7 @@ class ProfileNotifier extends StateNotifier<ProfileState> {
 
   ProfileNotifier(this._repository, this._userId) : super(const ProfileState()) {
     if (_userId != null) {
-      loadProfile();
+      Future<void>(loadProfile);
     }
   }
 

@@ -4,11 +4,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../providers/analytics_provider.dart';
 import '../../providers/profile_provider.dart';
-import '../../providers/job_provider.dart';
+import '../../providers/navigation_provider.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../widgets/error_widgets.dart';
 import '../../../core/theme/app_theme.dart';
-import '../main_shell_screen.dart';
 
 class AnalyticsDashboard extends ConsumerStatefulWidget {
   const AnalyticsDashboard({super.key});
@@ -226,7 +225,7 @@ class _AnalyticsDashboardState extends ConsumerState<AnalyticsDashboard>
               _SectionHeader(
                 title: 'Cash Flow',
                 subtitle:
-                    '6 months ending ${DateFormat('MMM yyyy').format(selectedMonth)} \u00b7 Collected vs Spent',
+                    '6 months ending ${DateFormat('MMM yyyy').format(selectedMonth)} \u00b7 Gross Income vs Expenses',
               ),
               const SizedBox(height: 12),
               _CashFlowChart(currencySymbol: currencySymbol),
@@ -281,7 +280,7 @@ class _AnalyticsDashboardState extends ConsumerState<AnalyticsDashboard>
       children: [
         Expanded(
           child: _HeroCard(
-            title: 'Collected',
+            title: 'Gross Income',
             value: '$cs${analytics.monthlyRevenue.toStringAsFixed(0)}',
             subtitle: 'Cash received',
             icon: Icons.trending_up,
@@ -291,7 +290,7 @@ class _AnalyticsDashboardState extends ConsumerState<AnalyticsDashboard>
         const SizedBox(width: 10),
         Expanded(
           child: _HeroCard(
-            title: 'Spent',
+            title: 'Expenses',
             value: '$cs${analytics.monthlyExpenses.toStringAsFixed(0)}',
             subtitle: 'Total costs',
             icon: Icons.arrow_downward,
@@ -301,7 +300,7 @@ class _AnalyticsDashboardState extends ConsumerState<AnalyticsDashboard>
         const SizedBox(width: 10),
         Expanded(
           child: _HeroCard(
-            title: 'Profit',
+            title: 'Net Income',
             value: '$cs${analytics.monthlyProfit.toStringAsFixed(0)}',
             subtitle: analytics.monthlyRevenue > 0
                 ? '${(analytics.monthlyProfit / analytics.monthlyRevenue * 100).toStringAsFixed(0)}% margin'
@@ -578,7 +577,7 @@ class _CashFlowChart extends ConsumerWidget {
                 padding: const EdgeInsets.only(left: 8, bottom: 12),
                 child: Row(
                   children: [
-                    _legendDot(AppColors.paid(context), 'Collected'),
+                    _legendDot(AppColors.paid(context), 'Gross Income'),
                     const SizedBox(width: 16),
                     _legendDot(AppColors.expense(context), 'Expenses'),
                   ],
@@ -598,7 +597,7 @@ class _CashFlowChart extends ConsumerWidget {
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {
                           final month = data[groupIndex];
                           final label =
-                              rodIndex == 0 ? 'Collected' : 'Expenses';
+                              rodIndex == 0 ? 'Gross Income' : 'Expenses';
                           final val = rodIndex == 0
                               ? month.income
                               : month.expenses;

@@ -60,6 +60,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedJobId = widget.jobId;
     if (_isEditing) {
       final e = widget.existingExpense!;
       _descriptionController.text = e.description;
@@ -79,7 +80,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _descriptionController.text = d['description']?.toString() ?? '';
       final amt = d['amount'];
       if (amt != null) {
-        _amountController.text = (amt is num) ? amt.toStringAsFixed(2) : amt.toString();
+        _amountController.text =
+            (amt is num) ? amt.toStringAsFixed(2) : amt.toString();
       }
       _vendorController.text = d['vendor']?.toString() ?? '';
       final cat = d['category']?.toString() ?? '';
@@ -87,7 +89,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         (e) => e.name == cat,
         orElse: () => ExpenseCategory.materials,
       );
-      if (d['taxDeductible'] == true) _taxDeductible = true;
+      if (d.containsKey('taxDeductible')) {
+        _taxDeductible = d['taxDeductible'] == true;
+      }
     }
   }
 
@@ -114,7 +118,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Discard Expense?'),
-        content: const Text('You have unsaved changes. Are you sure you want to go back?'),
+        content: const Text(
+            'You have unsaved changes. Are you sure you want to go back?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -122,7 +127,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Discard', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text('Discard',
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],
       ),
@@ -142,248 +148,252 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         if (shouldPop && context.mounted) Navigator.pop(context);
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Expense' : 'Add Expense'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () async {
-            final shouldPop = await _onWillPop();
-            if (shouldPop && context.mounted) Navigator.pop(context);
-          },
+        appBar: AppBar(
+          title: Text(_isEditing ? 'Edit Expense' : 'Add Expense'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final shouldPop = await _onWillPop();
+              if (shouldPop && context.mounted) Navigator.pop(context);
+            },
+          ),
         ),
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // Description
-            TextFormField(
-              key: const ValueKey('expense_description'),
-              controller: _descriptionController,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: InputDecoration(
-                labelText: 'Description *',
-                hintText: 'e.g., Lumber for deck project',
-                prefixIcon: const Icon(Icons.description),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-              ),
-              validator: (v) =>
-                  v?.trim().isEmpty ?? true ? 'Description is required' : null,
-            ),
-            const SizedBox(height: 16),
-
-            // Amount
-            TextFormField(
-              key: const ValueKey('expense_amount'),
-              controller: _amountController,
-              decoration: InputDecoration(
-                labelText: 'Amount *',
-                prefixText: '$currencySymbol ',
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-              ),
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Amount is required';
-                if (double.tryParse(v.trim()) == null)
-                  return 'Enter a valid amount';
-                if (double.parse(v.trim()) <= 0)
-                  return 'Amount must be positive';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Category
-            DropdownButtonFormField<ExpenseCategory>(
-              value: _selectedCategory,
-              decoration: InputDecoration(
-                labelText: 'Category *',
-                prefixIcon: Icon(_getCategoryIcon(_selectedCategory)),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-              ),
-              items: ExpenseCategory.values
-                  .map((c) => DropdownMenuItem(
-                        value: c,
-                        child: Row(
-                          children: [
-                            Icon(_getCategoryIcon(c),
-                                size: 20, color: _getCategoryColor(c)),
-                            const SizedBox(width: 10),
-                            Text(c.displayName),
-                          ],
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() {
-                  _selectedCategory = v;
-                  _taxDeductible = v.taxDeductible;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Vendor
-            TextFormField(
-              controller: _vendorController,
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                labelText: 'Vendor / Store',
-                hintText: 'e.g., Home Depot, Bunnings',
-                prefixIcon: const Icon(Icons.store),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Date picker
-            InkWell(
-              onTap: _pickDate,
-              borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // Description
+              TextFormField(
+                key: const ValueKey('expense_description'),
+                controller: _descriptionController,
+                textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  labelText: 'Date',
-                  prefixIcon: const Icon(Icons.calendar_today),
+                  labelText: 'Description *',
+                  hintText: 'e.g., Lumber for deck project',
+                  prefixIcon: const Icon(Icons.description),
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
                   filled: true,
                   fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                 ),
-                child: Text(
-                  DateFormat('EEEE, MMM d, y').format(_selectedDate),
-                  style: const TextStyle(fontSize: 16),
+                validator: (v) => v?.trim().isEmpty ?? true
+                    ? 'Description is required'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+
+              // Amount
+              TextFormField(
+                key: const ValueKey('expense_amount'),
+                controller: _amountController,
+                decoration: InputDecoration(
+                  labelText: 'Amount *',
+                  prefixText: '$currencySymbol ',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                ),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                ],
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty)
+                    return 'Amount is required';
+                  if (double.tryParse(v.trim()) == null)
+                    return 'Enter a valid amount';
+                  if (double.parse(v.trim()) <= 0)
+                    return 'Amount must be positive';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Category
+              DropdownButtonFormField<ExpenseCategory>(
+                value: _selectedCategory,
+                decoration: InputDecoration(
+                  labelText: 'Category *',
+                  prefixIcon: Icon(_getCategoryIcon(_selectedCategory)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                ),
+                items: ExpenseCategory.values
+                    .map((c) => DropdownMenuItem(
+                          value: c,
+                          child: Row(
+                            children: [
+                              Icon(_getCategoryIcon(c),
+                                  size: 20, color: _getCategoryColor(c)),
+                              const SizedBox(width: 10),
+                              Text(c.displayName),
+                            ],
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v == null) return;
+                  setState(() {
+                    _selectedCategory = v;
+                    _taxDeductible = v.taxDeductible;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Vendor
+              TextFormField(
+                controller: _vendorController,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: 'Vendor / Store',
+                  hintText: 'e.g., Home Depot, Bunnings',
+                  prefixIcon: const Icon(Icons.store),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // Payment method
-            DropdownButtonFormField<PaymentMethod>(
-              value: _selectedPaymentMethod,
-              decoration: InputDecoration(
-                labelText: 'Payment Method',
-                prefixIcon: const Icon(Icons.payment),
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
-              ),
-              items: PaymentMethod.values
-                  .map((m) => DropdownMenuItem(
-                        value: m,
-                        child: Text(m.displayName),
-                      ))
-                  .toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _selectedPaymentMethod = v);
-              },
-            ),
-            const SizedBox(height: 16),
-
-            // Tax deductible toggle
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: _taxDeductible
-                    ? Theme.of(context)
-                        .colorScheme
-                        .primaryContainer
-                        .withValues(alpha: 0.4)
-                    : Theme.of(context).colorScheme.surfaceContainerLow,
+              // Date picker
+              InkWell(
+                onTap: _pickDate,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: 'Date',
+                    prefixIcon: const Icon(Icons.calendar_today),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor:
+                        Theme.of(context).colorScheme.surfaceContainerLow,
+                  ),
+                  child: Text(
+                    DateFormat('EEEE, MMM d, y').format(_selectedDate),
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Payment method
+              DropdownButtonFormField<PaymentMethod>(
+                value: _selectedPaymentMethod,
+                decoration: InputDecoration(
+                  labelText: 'Payment Method',
+                  prefixIcon: const Icon(Icons.payment),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Theme.of(context).colorScheme.surfaceContainerLow,
+                ),
+                items: PaymentMethod.values
+                    .map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Text(m.displayName),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedPaymentMethod = v);
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Tax deductible toggle
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
                   color: _taxDeductible
                       ? Theme.of(context)
                           .colorScheme
-                          .primary
+                          .primaryContainer
                           .withValues(alpha: 0.4)
-                      : Theme.of(context).colorScheme.outlineVariant,
+                      : Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _taxDeductible
+                        ? Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.4)
+                        : Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Tax Deductible',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(
+                    _taxDeductible
+                        ? 'This expense can be claimed on tax'
+                        : 'Not a tax-deductible expense',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                  value: _taxDeductible,
+                  activeColor: Theme.of(context).colorScheme.primary,
+                  onChanged: (v) => setState(() => _taxDeductible = v),
                 ),
               ),
-              child: SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Tax Deductible',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text(
-                  _taxDeductible
-                      ? 'This expense can be claimed on tax'
-                      : 'Not a tax-deductible expense',
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
-                value: _taxDeductible,
-                activeColor: Theme.of(context).colorScheme.primary,
-                onChanged: (v) => setState(() => _taxDeductible = v),
-              ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Assign to Job (optional)
-            _buildJobPicker(),
-            const SizedBox(height: 20),
+              // Assign to Job (optional)
+              _buildJobPicker(),
+              const SizedBox(height: 20),
 
-            // Receipt attach
-            _buildReceiptSection(),
-            const SizedBox(height: 16),
+              // Receipt attach
+              _buildReceiptSection(),
+              const SizedBox(height: 16),
 
-            // Extracted receipt line items (from AI scan)
-            _buildExtractedItemsSection(),
-            const SizedBox(height: 32),
+              // Extracted receipt line items (from AI scan)
+              _buildExtractedItemsSection(),
+              const SizedBox(height: 32),
 
-            const SizedBox(height: 80), // space for bottom button
-          ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: FilledButton(
-          key: const ValueKey('expense_save'),
-          onPressed: _isSubmitting ? null : _submitExpense,
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-            elevation: 2,
+              const SizedBox(height: 80), // space for bottom button
+            ],
           ),
-          child: _isSubmitting
-              ? SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(
-                      color: Theme.of(context).colorScheme.onPrimary,
-                      strokeWidth: 2.5),
-                )
-              : Text(
-                  _isEditing ? 'UPDATE EXPENSE' : 'ADD EXPENSE',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      letterSpacing: 0.5),
-                ),
+        ),
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: FilledButton(
+              key: const ValueKey('expense_save'),
+              onPressed: _isSubmitting ? null : _submitExpense,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                elevation: 2,
+              ),
+              child: _isSubmitting
+                  ? SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                          color: Theme.of(context).colorScheme.onPrimary,
+                          strokeWidth: 2.5),
+                    )
+                  : Text(
+                      _isEditing ? 'UPDATE EXPENSE' : 'ADD EXPENSE',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          letterSpacing: 0.5),
+                    ),
+            ),
+          ),
         ),
       ),
-    ),
-    ),
     );
   }
 
@@ -554,16 +564,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
 
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Text(
-                'Tap items to include or exclude them',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Tap items to include or exclude them',
+              style: TextStyle(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
+          ),
 
           // Column headers
           Container(
@@ -610,7 +620,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isSelected ? null : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
+                  color: isSelected
+                      ? null
+                      : colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                   border: Border(
                     bottom: BorderSide(
                       color: colorScheme.outlineVariant.withValues(alpha: 0.3),
@@ -623,9 +635,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     SizedBox(
                       width: 24,
                       child: Icon(
-                        isSelected ? Icons.check_box : Icons.check_box_outline_blank,
+                        isSelected
+                            ? Icons.check_box
+                            : Icons.check_box_outline_blank,
                         size: 20,
-                        color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
+                        color: isSelected
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -635,7 +651,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         item.name,
                         style: textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w500,
-                          decoration: isSelected ? null : TextDecoration.lineThrough,
+                          decoration:
+                              isSelected ? null : TextDecoration.lineThrough,
                           color: isSelected ? null : colorScheme.outlineVariant,
                         ),
                         maxLines: 2,
@@ -647,7 +664,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       child: Text(
                         '${item.quantity}',
                         style: textTheme.bodySmall?.copyWith(
-                          color: isSelected ? colorScheme.onSurfaceVariant : colorScheme.outlineVariant,
+                          color: isSelected
+                              ? colorScheme.onSurfaceVariant
+                              : colorScheme.outlineVariant,
                         ),
                         textAlign: TextAlign.center,
                       ),
@@ -658,7 +677,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         '$currencySymbol${item.totalPrice.toStringAsFixed(2)}',
                         style: textTheme.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
-                          decoration: isSelected ? null : TextDecoration.lineThrough,
+                          decoration:
+                              isSelected ? null : TextDecoration.lineThrough,
                           color: isSelected ? null : colorScheme.outlineVariant,
                         ),
                         textAlign: TextAlign.right,
@@ -692,7 +712,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             } else if (hasTax && result.total != null && result.total! > 0) {
               reviewedTax = result.tax! *
                   (reviewedSubtotal /
-                      (result.total! - result.tax!).clamp(0.01, double.infinity));
+                      (result.total! - result.tax!)
+                          .clamp(0.01, double.infinity));
             } else {
               reviewedTax = 0;
             }
@@ -858,9 +879,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       color: hasSelection
                           ? Theme.of(context).colorScheme.primary
                           : Theme.of(context).colorScheme.onSurfaceVariant,
-                      fontWeight: hasSelection
-                          ? FontWeight.w600
-                          : FontWeight.normal,
+                      fontWeight:
+                          hasSelection ? FontWeight.w600 : FontWeight.normal,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -893,9 +913,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     if (jobs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text(
-                'No jobs found. Create a job first.')),
+        const SnackBar(content: Text('No jobs found. Create a job first.')),
       );
       return;
     }
@@ -925,7 +943,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Select Job',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
                 Flexible(
                   child: ListView(
@@ -943,8 +962,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           job.clientName.toLowerCase().trim() !=
                               job.title.toLowerCase().trim()) {
                         subtitle = job.clientName;
-                      } else if (job.trade != null &&
-                          job.trade!.isNotEmpty) {
+                      } else if (job.trade != null && job.trade!.isNotEmpty) {
                         subtitle = job.trade!;
                       } else if (job.status.isActive) {
                         subtitle =
@@ -961,7 +979,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                             size: 18,
                             color: isSelected
                                 ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onPrimaryContainer,
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer,
                           ),
                         ),
                         title: Text(job.title,
@@ -1200,8 +1220,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   : item.unitPrice * item.quantity;
             }
             double keptTax = 0;
-            if (parsed.tax != null && parsed.tax! > 0 &&
-                parsed.subtotal != null && parsed.subtotal! > 0) {
+            if (parsed.tax != null &&
+                parsed.tax! > 0 &&
+                parsed.subtotal != null &&
+                parsed.subtotal! > 0) {
               keptTax = parsed.tax! * (keptSubtotal / parsed.subtotal!);
             }
             final filtered = ReceiptAiResult(
@@ -1249,7 +1271,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           } else if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Receipt image could not be uploaded. Expense saved without cloud backup.'),
+                content: Text(
+                    'Receipt image could not be uploaded. Expense saved without cloud backup.'),
                 duration: Duration(seconds: 4),
               ),
             );
@@ -1258,7 +1281,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }
 
       // Derive customerId from selected job if available
-      String? resolvedJobId = _selectedJobId ?? widget.jobId ?? widget.existingExpense?.jobId;
+      String? resolvedJobId =
+          _selectedJobId ?? widget.jobId ?? widget.existingExpense?.jobId;
       String? resolvedCustomerId;
       if (resolvedJobId != null) {
         final jobs = ref.read(jobListProvider).jobs;
@@ -1338,7 +1362,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     } catch (e) {
       if (mounted) {
         final msg = e.toString().toLowerCase();
-        final isOffline = msg.contains('socketexception') || msg.contains('network');
+        final isOffline =
+            msg.contains('socketexception') || msg.contains('network');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(isOffline

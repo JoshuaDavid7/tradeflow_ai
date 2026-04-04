@@ -49,10 +49,22 @@ class SupabaseService {
   Map<String, dynamic> _normalizeFunctionResponse(FunctionResponse response) {
     // Handle both string and map responses
     if (response.data is String) {
-      return {'result': response.data};
+      final raw = response.data as String;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        return {'result': decoded};
+      } catch (_) {
+        return {'result': raw};
+      }
     }
     if (response.data is Map<String, dynamic>) {
       return response.data as Map<String, dynamic>;
+    }
+    if (response.data is Map) {
+      return Map<String, dynamic>.from(response.data as Map);
     }
     return {'result': response.data};
   }
@@ -419,13 +431,11 @@ class SupabaseService {
         );
       }
 
-      final response = await _client.functions
-          .invoke(
-            functionName,
-            body: body,
-            headers: {'Authorization': 'Bearer $token'},
-          )
-          .timeout(const Duration(seconds: 35));
+      final response = await _client.functions.invoke(
+        functionName,
+        body: body,
+        headers: {'Authorization': 'Bearer $token'},
+      ).timeout(const Duration(seconds: 35));
 
       if (response.status != 200) {
         throw Exception(

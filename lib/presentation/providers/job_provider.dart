@@ -36,7 +36,7 @@ class JobListNotifier extends StateNotifier<JobListState> {
 
   JobListNotifier(this._repository, this._userId) : super(const JobListState()) {
     if (_userId != null) {
-      loadJobs();
+      Future<void>(loadJobs);
     }
   }
 

@@ -47,10 +47,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   List<Customer> get _filteredCustomers {
     if (_searchQuery.isEmpty) return _customers;
     final q = _searchQuery.toLowerCase();
-    return _customers.where((c) =>
-        c.name.toLowerCase().contains(q) ||
-        (c.email?.toLowerCase().contains(q) ?? false) ||
-        (c.phone?.contains(q) ?? false)).toList();
+    return _customers
+        .where((c) =>
+            c.name.toLowerCase().contains(q) ||
+            (c.email?.toLowerCase().contains(q) ?? false) ||
+            (c.phone?.contains(q) ?? false))
+        .toList();
   }
 
   @override
@@ -61,6 +63,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         title: const Text('Customers'),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'customer_list_fab',
         onPressed: _showAddCustomerDialog,
         icon: const Icon(Icons.person_add),
         label: const Text('Add Customer'),
@@ -88,7 +91,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      _statChip('${_customers.length}', 'Total', colorScheme.primary),
+                      _statChip(
+                          '${_customers.length}', 'Total', colorScheme.primary),
                       const SizedBox(width: 8),
                       _statChip(
                           '${_customers.where((c) => c.createdAt.isAfter(DateTime.now().subtract(const Duration(days: 30)))).length}',
@@ -106,7 +110,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           child: ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             itemCount: _filteredCustomers.length,
-                            itemBuilder: (context, index) => _buildCustomerCard(_filteredCustomers[index]),
+                            itemBuilder: (context, index) =>
+                                _buildCustomerCard(_filteredCustomers[index]),
                           ),
                         ),
                 ),
@@ -118,12 +123,18 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Widget _statChip(String value, String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10)),
       child: Row(
         children: [
-          Text(value, style: TextStyle(fontWeight: FontWeight.w900, color: color, fontSize: 16)),
+          Text(value,
+              style: TextStyle(
+                  fontWeight: FontWeight.w900, color: color, fontSize: 16)),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: color.withValues(alpha: 0.8), fontSize: 12)),
+          Text(label,
+              style:
+                  TextStyle(color: color.withValues(alpha: 0.8), fontSize: 12)),
         ],
       ),
     );
@@ -144,24 +155,37 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               CircleAvatar(
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                 child: Text(c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimaryContainer)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color:
+                            Theme.of(context).colorScheme.onPrimaryContainer)),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(c.name, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(c.name,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 2),
                     Text(
-                      [c.phone, c.email].where((e) => e != null && e.isNotEmpty).join(' | '),
-                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
+                      [c.phone, c.email]
+                          .where((e) => e != null && e.isNotEmpty)
+                          .join(' | '),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outlineVariant),
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.outlineVariant),
             ],
           ),
         ),
@@ -173,7 +197,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.65,
         maxChildSize: 0.95,
@@ -185,47 +210,86 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Center(child: Container(width: 40, height: 5, decoration: BoxDecoration(color: Theme.of(context).colorScheme.outlineVariant, borderRadius: BorderRadius.circular(10)))),
+              Center(
+                  child: Container(
+                      width: 40,
+                      height: 5,
+                      decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 20),
               Row(
                 children: [
                   CircleAvatar(
-                    radius: 30, backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    child: Text(c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
-                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.onPrimaryContainer)),
+                    radius: 30,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.primaryContainer,
+                    child: Text(
+                        c.name.isNotEmpty ? c.name[0].toUpperCase() : '?',
+                        style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onPrimaryContainer)),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(c.name, overflow: TextOverflow.ellipsis, maxLines: 1, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                        Text('Since ${DateFormat('MMM yyyy').format(c.createdAt)}',
-                            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+                        Text(c.name,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                                fontSize: 22, fontWeight: FontWeight.w900)),
+                        Text(
+                            'Since ${DateFormat('MMM yyyy').format(c.createdAt)}',
+                            style: TextStyle(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                                fontSize: 13)),
                       ],
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              if (c.phone != null && c.phone!.isNotEmpty) _detailRow(Icons.phone, c.phone!),
-              if (c.email != null && c.email!.isNotEmpty) _detailRow(Icons.email, c.email!),
-              if (c.address != null && c.address!.isNotEmpty) _detailRow(Icons.location_on, c.address!),
+              if (c.phone != null && c.phone!.isNotEmpty)
+                _detailRow(Icons.phone, c.phone!),
+              if (c.email != null && c.email!.isNotEmpty)
+                _detailRow(Icons.email, c.email!),
+              if (c.address != null && c.address!.isNotEmpty)
+                _detailRow(Icons.location_on, c.address!),
               if (c.notes != null && c.notes!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text('NOTES', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.onSurfaceVariant, letterSpacing: 1)),
+                Text('NOTES',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        letterSpacing: 1)),
                 const SizedBox(height: 6),
-                Text(c.notes!, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                Text(c.notes!,
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant)),
               ],
               const SizedBox(height: 24),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () { Navigator.pop(context); _showEditCustomerDialog(c); },
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showEditCustomerDialog(c);
+                      },
                       icon: const Icon(Icons.edit),
                       label: const Text('Edit'),
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -233,8 +297,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () => _confirmDeleteCustomer(c),
                       icon: const Icon(Icons.delete_outline, color: Colors.red),
-                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48), side: const BorderSide(color: Colors.red), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      label: const Text('Delete',
+                          style: TextStyle(color: Colors.red)),
+                      style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          side: const BorderSide(color: Colors.red),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12))),
                     ),
                   ),
                 ],
@@ -266,10 +335,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     // Check for linked jobs before deleting
     int linkedJobCount = 0;
     try {
-      final jobs = await _supabase
-          .from('jobs')
-          .select('id')
-          .eq('customer_id', c.id);
+      final jobs =
+          await _supabase.from('jobs').select('id').eq('customer_id', c.id);
       linkedJobCount = (jobs as List).length;
     } catch (_) {
       // If check fails, proceed with basic warning
@@ -299,7 +366,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               Navigator.pop(ctx);
               _deleteCustomer(c.id);
             },
-            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+            style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error),
             child: const Text('Delete'),
           ),
         ],
@@ -339,20 +407,42 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name *', prefixIcon: Icon(Icons.person)), textCapitalization: TextCapitalization.words),
+              TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Name *', prefixIcon: Icon(Icons.person)),
+                  textCapitalization: TextCapitalization.words),
               const SizedBox(height: 12),
-              TextField(controller: phoneCtrl, decoration: const InputDecoration(labelText: 'Phone', prefixIcon: Icon(Icons.phone)), keyboardType: TextInputType.phone),
+              TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Phone', prefixIcon: Icon(Icons.phone)),
+                  keyboardType: TextInputType.phone),
               const SizedBox(height: 12),
-              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email)), keyboardType: TextInputType.emailAddress),
+              TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Email', prefixIcon: Icon(Icons.email)),
+                  keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 12),
-              TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Address', prefixIcon: Icon(Icons.location_on)), maxLines: 2),
+              TextField(
+                  controller: addressCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Address',
+                      prefixIcon: Icon(Icons.location_on)),
+                  maxLines: 2),
               const SizedBox(height: 12),
-              TextField(controller: notesCtrl, decoration: const InputDecoration(labelText: 'Notes', prefixIcon: Icon(Icons.notes)), maxLines: 2),
+              TextField(
+                  controller: notesCtrl,
+                  decoration: const InputDecoration(
+                      labelText: 'Notes', prefixIcon: Icon(Icons.notes)),
+                  maxLines: 2),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               if (nameCtrl.text.trim().isEmpty) return;
@@ -360,13 +450,24 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               final data = {
                 'user_id': userId,
                 'name': nameCtrl.text.trim(),
-                'phone': phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                'email': emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-                'address': addressCtrl.text.trim().isEmpty ? null : addressCtrl.text.trim(),
-                'notes': notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                'phone': phoneCtrl.text.trim().isEmpty
+                    ? null
+                    : phoneCtrl.text.trim(),
+                'email': emailCtrl.text.trim().isEmpty
+                    ? null
+                    : emailCtrl.text.trim(),
+                'address': addressCtrl.text.trim().isEmpty
+                    ? null
+                    : addressCtrl.text.trim(),
+                'notes': notesCtrl.text.trim().isEmpty
+                    ? null
+                    : notesCtrl.text.trim(),
               };
               if (existing != null) {
-                await _supabase.from('customers').update(data).eq('id', existing.id);
+                await _supabase
+                    .from('customers')
+                    .update(data)
+                    .eq('id', existing.id);
               } else {
                 await _supabase.from('customers').insert(data);
               }
@@ -386,12 +487,21 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline, size: 70, color: Theme.of(context).colorScheme.outlineVariant),
+          Icon(Icons.people_outline,
+              size: 70, color: Theme.of(context).colorScheme.outlineVariant),
           const SizedBox(height: 16),
-          Text('No customers yet', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text('No customers yet',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(height: 6),
-          Text('Customers are auto-created from voice invoices\nor tap + to add manually',
-              textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
+          Text(
+              'Customers are auto-created from voice invoices\nor tap + to add manually',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 13)),
         ],
       ),
     );

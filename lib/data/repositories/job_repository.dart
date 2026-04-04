@@ -39,6 +39,7 @@ class JobRepository implements IJobRepository {
   /// second awaits the same Future, preventing the race condition where one
   /// caller's DELETE wipes out the other's freshly-INSERTed records.
   Completer<void>? _reconciliationGuard;
+  final Map<String, String> _lastReconciliationFingerprintByUser = {};
 
   JobRepository(this._db) : _supabase = Supabase.instance.client;
 
@@ -471,6 +472,7 @@ class JobRepository implements IJobRepository {
   /// Returns cash collected per month for a list of [months].
   /// Uses actual Payment records grouped by receivedAt — handles partial
   /// payments correctly (each payment counted in the month it was received).
+  @override
   Future<Map<DateTime, double>> getMonthlyCollectedForMonths(
       String userId, List<DateTime> months) async {
     final result = <DateTime, double>{};
@@ -515,12 +517,18 @@ class JobRepository implements IJobRepository {
 
     _reconciliationGuard = Completer<void>();
     try {
+      final fingerprint = _buildReconciliationFingerprint(remoteRows);
+      if (_lastReconciliationFingerprintByUser[userId] == fingerprint) {
+        return;
+      }
+
       // Clear stale auto-reconciled records first. They will be re-created
       // below with the correct receivedAt dates. Real payment records
       // (from recordPayment / Mark Paid) have reference != 'auto-reconciled'
       // and are left untouched.
       await _db.jobDao.deleteAutoReconciledPayments(userId);
 
+      var reconciledCount = 0;
       for (final row in remoteRows) {
         // Reconcile jobs that are fully paid (by amount or payment_status).
         final total = _asDouble(row['total_amount']);
@@ -565,11 +573,13 @@ class JobRepository implements IJobRepository {
           reference: 'auto-reconciled',
           receivedAt: paidAt,
         );
+        reconciledCount += 1;
+      }
 
-        ErrorHandler.info('Reconciled paid job into local payments', {
-          'jobId': jobId,
-          'amount': total,
-          'paidAt': paidAt.toIso8601String(),
+      _lastReconciliationFingerprintByUser[userId] = fingerprint;
+      if (reconciledCount > 0) {
+        ErrorHandler.debug('Reconciled paid jobs into local payments', {
+          'count': reconciledCount,
         });
       }
     } catch (error, _) {
@@ -581,6 +591,31 @@ class JobRepository implements IJobRepository {
       _reconciliationGuard!.complete();
       _reconciliationGuard = null;
     }
+  }
+
+  String _buildReconciliationFingerprint(List<Map<String, dynamic>> remoteRows) {
+    final parts = remoteRows.map((row) {
+      final id = row['id']?.toString() ?? '';
+      final total = _asDouble(row['total_amount']).toStringAsFixed(2);
+      final amountPaid = _asDouble(row['amount_paid']).toStringAsFixed(2);
+      final paymentStatus =
+          row['payment_status']?.toString().toLowerCase().trim() ?? '';
+      final paymentPaidAt = row['payment_paid_at']?.toString() ?? '';
+      final paidAt = row['paid_at']?.toString() ?? '';
+      final createdAt = row['created_at']?.toString() ?? '';
+      return [
+        id,
+        total,
+        amountPaid,
+        paymentStatus,
+        paymentPaidAt,
+        paidAt,
+        createdAt,
+      ].join('|');
+    }).toList()
+      ..sort();
+
+    return parts.join('||');
   }
 
   @override
@@ -610,7 +645,7 @@ class JobRepository implements IJobRepository {
       final jobStatus = (jobRow['status']?.toString().toLowerCase()) ?? '';
       if (jobStatus == 'cancelled' || jobStatus == 'superseded') {
         throw BusinessException(
-          message: 'Cannot record a payment on a ${jobStatus} invoice.',
+          message: 'Cannot record a payment on a $jobStatus invoice.',
           code: 'INVALID_STATUS',
         );
       }

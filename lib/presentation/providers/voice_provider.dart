@@ -8,7 +8,7 @@ import '../../core/errors/error_handler.dart';
 final voiceCaptureServiceProvider = Provider<VoiceCaptureService>((ref) {
   final repository = ref.watch(voiceRepositoryProvider);
   final connectivity = ConnectivityService.instance;
-  
+
   return VoiceCaptureService(repository, connectivity);
 });
 
@@ -36,9 +36,17 @@ class VoiceCaptureNotifier extends StateNotifier<VoiceCaptureProgress> {
 
   /// Stop and process recording.
   /// Pass [invoiceContext] when refining an existing invoice.
-  Future<VoiceCaptureResult?> stopAndProcess({Map<String, dynamic>? invoiceContext}) async {
+  Future<VoiceCaptureResult?> stopAndProcess({
+    Map<String, dynamic>? invoiceContext,
+    bool extractJobData = true,
+    List<String>? knownCustomers,
+  }) async {
     try {
-      final result = await _service.stopAndProcess(invoiceContext: invoiceContext);
+      final result = await _service.stopAndProcess(
+        invoiceContext: invoiceContext,
+        extractJobData: extractJobData,
+        knownCustomers: knownCustomers,
+      );
       return result;
     } catch (error, stackTrace) {
       ErrorHandler.handle(error, stackTrace);

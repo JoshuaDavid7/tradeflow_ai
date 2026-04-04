@@ -99,7 +99,7 @@ class AnalyticsNotifier extends StateNotifier<AsyncValue<BusinessAnalytics>> {
     this._userId,
   ) : super(const AsyncValue.loading()) {
     if (_userId != null) {
-      _initAndLoad();
+      Future<void>(_initAndLoad);
     }
   }
 
