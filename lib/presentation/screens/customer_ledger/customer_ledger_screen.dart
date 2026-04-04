@@ -57,8 +57,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                 final filtered = _searchQuery.isEmpty
                     ? customers
                     : customers.where((c) {
-                        final name =
-                            (c['name'] ?? '').toString().toLowerCase();
+                        final name = (c['name'] ?? '').toString().toLowerCase();
                         final email =
                             (c['email'] ?? '').toString().toLowerCase();
                         final phone =
@@ -93,10 +92,12 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                           const SizedBox(height: 20),
                           FilledButton.icon(
                             onPressed: () => _showAddCustomerDialog(context),
-                            icon: const Icon(Icons.person_add_rounded, size: 18),
+                            icon:
+                                const Icon(Icons.person_add_rounded, size: 18),
                             label: const Text('Add Client'),
                             style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 12),
                             ),
                           ),
                         ],
@@ -114,7 +115,8 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final customer = filtered[index];
-                      return _buildCustomerCard(context, customer, currencySymbol);
+                      return _buildCustomerCard(
+                          context, customer, currencySymbol);
                     },
                   ),
                 );
@@ -134,13 +136,15 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.cloud_off_rounded, size: 48, color: cs.error.withValues(alpha: 0.5)),
+                      Icon(Icons.cloud_off_rounded,
+                          size: 48, color: cs.error.withValues(alpha: 0.5)),
                       const SizedBox(height: 12),
                       Text('Could not load clients',
                           style: AppTextStyles.emptyTitle(textTheme, cs)),
                       const SizedBox(height: 8),
                       FilledButton.icon(
-                        onPressed: () => ref.invalidate(customerLedgerListProvider),
+                        onPressed: () =>
+                            ref.invalidate(customerLedgerListProvider),
                         icon: const Icon(Icons.refresh, size: 18),
                         label: const Text('Retry'),
                       ),
@@ -153,14 +157,15 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'customer_ledger_fab',
         onPressed: () => _showAddCustomerDialog(context),
         child: const Icon(Icons.person_add),
       ),
     );
   }
 
-  Widget _buildCustomerCard(
-      BuildContext context, Map<String, dynamic> customer, String currencySymbol) {
+  Widget _buildCustomerCard(BuildContext context, Map<String, dynamic> customer,
+      String currencySymbol) {
     final name = customer['name'] ?? 'Unknown';
     final email = customer['email'] ?? '';
     final phone = customer['phone'] ?? '';
@@ -219,7 +224,9 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                       spacing: 6,
                       runSpacing: 4,
                       children: [
-                        _buildChip('$jobCount ${jobCount == 1 ? 'job' : 'jobs'}', cs.primary),
+                        _buildChip(
+                            '$jobCount ${jobCount == 1 ? 'job' : 'jobs'}',
+                            cs.primary),
                         if (totalBilled > 0)
                           _buildChip(
                               '$currencySymbol${totalBilled.toStringAsFixed(0)} billed',
@@ -338,7 +345,8 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   return;
                 }
                 if (name.length < 2) {
-                  setDialogState(() => nameError = 'Name must be at least 2 characters');
+                  setDialogState(
+                      () => nameError = 'Name must be at least 2 characters');
                   return;
                 }
 
@@ -346,19 +354,22 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                 final email = emailCtrl.text.trim();
                 if (email.isNotEmpty &&
                     !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-                  setDialogState(() => emailError = 'Enter a valid email address');
+                  setDialogState(
+                      () => emailError = 'Enter a valid email address');
                   return;
                 }
 
                 // Check for duplicate name (soft warning, allow on second tap)
                 if (!duplicateWarningShown) {
-                  final existing = ref.read(customerLedgerListProvider).valueOrNull ?? [];
+                  final existing =
+                      ref.read(customerLedgerListProvider).valueOrNull ?? [];
                   final duplicate = existing.any((c) =>
                       (c['name']?.toString() ?? '').trim().toLowerCase() ==
                       name.toLowerCase());
                   if (duplicate) {
                     setDialogState(() {
-                      nameError = 'A client named "$name" already exists. Tap Add again to proceed.';
+                      nameError =
+                          'A client named "$name" already exists. Tap Add again to proceed.';
                       duplicateWarningShown = true;
                     });
                     return;
@@ -393,7 +404,8 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   try {
                     await supabase.client.from('customers').insert(payload);
                   } catch (e) {
-                    debugPrint('Customer insert with all columns failed, retrying: $e');
+                    debugPrint(
+                        'Customer insert with all columns failed, retrying: $e');
                     // Fallback: if new columns don't exist yet, try without them
                     payload.remove('total_billed');
                     payload.remove('total_paid');
@@ -408,7 +420,8 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(
-                          content: const Text('Could not add client. Please try again.'),
+                          content: const Text(
+                              'Could not add client. Please try again.'),
                           backgroundColor: Colors.red),
                     );
                   }

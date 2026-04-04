@@ -13,7 +13,8 @@ import '../../widgets/shimmer_loading.dart';
 import '../../widgets/error_widgets.dart';
 import 'add_expense_screen.dart';
 import '../../../data/local/database.dart' show databaseProvider;
-import '../../../data/repositories/expense_repository.dart' show expenseRepositoryProvider;
+import '../../../data/repositories/expense_repository.dart'
+    show expenseRepositoryProvider;
 import '../../../data/services/supabase_service.dart' show userIdProvider;
 
 class ExpenseListScreen extends ConsumerStatefulWidget {
@@ -104,6 +105,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'expense_list_fab',
         onPressed: () => _navigateToAddExpense(context),
         child: const Icon(Icons.add),
       ),
@@ -168,7 +170,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   margin: const EdgeInsets.only(top: 8, bottom: 16),
                   decoration: BoxDecoration(
                     color: cs.outlineVariant.withValues(alpha: 0.5),
@@ -176,7 +179,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                   ),
                 ),
                 Text('Select month',
-                    style: ts.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    style:
+                        ts.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 12),
                 Flexible(
                   child: ListView.builder(
@@ -186,8 +190,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                       final m = months[i];
                       final isSel =
                           m.year == selected.year && m.month == selected.month;
-                      final isCur =
-                          m.year == now.year && m.month == now.month;
+                      final isCur = m.year == now.year && m.month == now.month;
                       return ListTile(
                         leading: Icon(
                           isSel ? Icons.check_circle : Icons.circle_outlined,
@@ -204,7 +207,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                           ),
                         ),
                         onTap: () {
-                          ref.read(selectedExpenseMonthProvider.notifier).state = m;
+                          ref
+                              .read(selectedExpenseMonthProvider.notifier)
+                              .state = m;
                           Navigator.pop(ctx);
                         },
                       );
@@ -243,8 +248,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
       data: (breakdown) {
         // Review count from needsAction provider
         final reviewCount = needsAction.whenOrNull(
-          data: (b) => b.estimated.length + b.unassigned.length,
-        ) ?? 0;
+              data: (b) => b.estimated.length + b.unassigned.length,
+            ) ??
+            0;
 
         return Container(
           margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
@@ -284,15 +290,18 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                 children: [
                   _summaryMetric(context,
                       label: 'Logged',
-                      value: '$currencySymbol${breakdown.standaloneMonthly.toStringAsFixed(0)}'),
+                      value:
+                          '$currencySymbol${breakdown.standaloneMonthly.toStringAsFixed(0)}'),
                   _summaryDot(context),
                   _summaryMetric(context,
                       label: 'From invoices',
-                      value: '$currencySymbol${breakdown.materialCostMonthly.toStringAsFixed(0)}'),
+                      value:
+                          '$currencySymbol${breakdown.materialCostMonthly.toStringAsFixed(0)}'),
                   if (reviewCount > 0) ...[
                     _summaryDot(context),
                     GestureDetector(
-                      onTap: () => setState(() => _costFilter = _CostFilter.toReview),
+                      onTap: () =>
+                          setState(() => _costFilter = _CostFilter.toReview),
                       child: _summaryMetric(context,
                           label: 'To review',
                           value: '$reviewCount',
@@ -505,11 +514,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                 if (remaining < items.length) {
                   final row = items[remaining];
                   if (row.isGroup) {
-                    return _buildGroupedRow(
-                        context, row, currencySymbol);
+                    return _buildGroupedRow(context, row, currencySymbol);
                   } else {
-                    return _buildLedgerRow(
-                        context, row.entry!, currencySymbol);
+                    return _buildLedgerRow(context, row.entry!, currencySymbol);
                   }
                 }
                 remaining -= items.length;
@@ -681,10 +688,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     final isSelected =
         monthLabel == DateFormat('MMMM yyyy').format(selectedMonth);
     final now = DateTime.now();
-    final isCurrentMonth =
-        monthLabel == DateFormat('MMMM yyyy').format(now);
-    final displayLabel =
-        isCurrentMonth ? 'This Month' : monthLabel;
+    final isCurrentMonth = monthLabel == DateFormat('MMMM yyyy').format(now);
+    final displayLabel = isCurrentMonth ? 'This Month' : monthLabel;
 
     return Padding(
       padding: const EdgeInsets.only(top: 16, bottom: 8),
@@ -820,9 +825,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     final dateLine = dateFormat.format(entry.date);
 
     // Amount styling
-    final amountColor = isLinkedExp
-        ? colorScheme.onSurfaceVariant
-        : AppColors.overdue(context);
+    final amountColor =
+        isLinkedExp ? colorScheme.onSurfaceVariant : AppColors.overdue(context);
     final amountDecoration =
         isLinkedExp ? TextDecoration.lineThrough : TextDecoration.none;
 
@@ -862,9 +866,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: isLinkedExp
-                            ? colorScheme.onSurfaceVariant
-                            : null,
+                        color:
+                            isLinkedExp ? colorScheme.onSurfaceVariant : null,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -911,8 +914,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                         if (entry.expense?.hasReceipt == true) ...[
                           const SizedBox(width: 6),
                           Icon(Icons.attach_file,
-                              size: 12,
-                              color: colorScheme.onSurfaceVariant),
+                              size: 12, color: colorScheme.onSurfaceVariant),
                         ],
                       ],
                     ),
@@ -939,8 +941,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
 
   // ── Grouped Invoice Row ─────────────────────────────────────────────────────
 
-  Widget _buildGroupedRow(
-      BuildContext context, _DisplayRow row, String cs) {
+  Widget _buildGroupedRow(BuildContext context, _DisplayRow row, String cs) {
     final colorScheme = Theme.of(context).colorScheme;
     final dateFormat = DateFormat('MMM d, y');
 
@@ -1132,8 +1133,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                           '${row.itemCount} items',
                         ].join(' · '),
                         style: TextStyle(
-                            fontSize: 14,
-                            color: colorScheme.onSurfaceVariant),
+                            fontSize: 14, color: colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -1171,16 +1171,14 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
             if (row.clientName != null && row.clientName!.isNotEmpty)
               _detailRow(Icons.person_outline, 'Client', row.clientName!),
             if (row.invoiceNumber != null && row.invoiceNumber!.isNotEmpty)
-              _detailRow(
-                  Icons.receipt_outlined, 'Invoice', row.invoiceNumber!),
+              _detailRow(Icons.receipt_outlined, 'Invoice', row.invoiceNumber!),
             const SizedBox(height: 16),
 
             // Summary badges
             Row(
               children: [
                 if (row.estimatedCount > 0) ...[
-                  Icon(Icons.schedule,
-                      size: 16, color: Colors.amber.shade700),
+                  Icon(Icons.schedule, size: 16, color: Colors.amber.shade700),
                   const SizedBox(width: 4),
                   Text('${row.estimatedCount} estimated',
                       style: TextStyle(
@@ -1226,8 +1224,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(11)),
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(11)),
                     ),
                     child: Row(
                       children: [
@@ -1326,8 +1324,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                       borderRadius: const BorderRadius.vertical(
                           bottom: Radius.circular(11)),
                       border: Border(
-                          top: BorderSide(
-                              color: colorScheme.outlineVariant)),
+                          top: BorderSide(color: colorScheme.outlineVariant)),
                     ),
                     child: Row(
                       children: [
@@ -1366,16 +1363,15 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
               const SizedBox(height: 8),
               ...linked.map((le) => Card(
                     elevation: 0,
-                    color: colorScheme.surfaceContainerLow
-                        .withValues(alpha: 0.5),
+                    color:
+                        colorScheme.surfaceContainerLow.withValues(alpha: 0.5),
                     margin: const EdgeInsets.only(bottom: 6),
                     child: Padding(
                       padding: const EdgeInsets.all(10),
                       child: Row(
                         children: [
                           Icon(Icons.link,
-                              size: 16,
-                              color: colorScheme.onSurfaceVariant),
+                              size: 16, color: colorScheme.onSurfaceVariant),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Column(
@@ -1389,8 +1385,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                                   Text(le.vendor!,
                                       style: TextStyle(
                                           fontSize: 11,
-                                          color:
-                                              colorScheme.onSurfaceVariant)),
+                                          color: colorScheme.onSurfaceVariant)),
                               ],
                             ),
                           ),
@@ -1518,7 +1513,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: colorScheme.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
@@ -1605,11 +1601,10 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
               _detailRow(Icons.calendar_today, 'Recognized',
                   DateFormat('MMM d, y').format(cost.recognitionDate)),
               if (entry.clientName != null)
-                _detailRow(
-                    Icons.person_outline, 'Client', entry.clientName!),
+                _detailRow(Icons.person_outline, 'Client', entry.clientName!),
               if (entry.invoiceNumber != null)
-                _detailRow(Icons.receipt_outlined, 'Invoice',
-                    entry.invoiceNumber!),
+                _detailRow(
+                    Icons.receipt_outlined, 'Invoice', entry.invoiceNumber!),
               if (cost.provisionalCost != cost.canonicalCost)
                 _detailRow(Icons.compare_arrows, 'Invoice estimate',
                     '$cs${cost.provisionalCost.toStringAsFixed(2)}'),
@@ -1626,14 +1621,13 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                         letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: AppColors.paid(context).withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color:
-                            AppColors.paid(context).withValues(alpha: 0.15)),
+                        color: AppColors.paid(context).withValues(alpha: 0.15)),
                   ),
                   child: Row(
                     children: [
@@ -1646,8 +1640,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                                 fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
                       if (receiptAmount != null)
-                        Text(
-                            '$cs${receiptAmount!.toStringAsFixed(2)}',
+                        Text('$cs${receiptAmount!.toStringAsFixed(2)}',
                             style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -1659,7 +1652,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
               const SizedBox(height: 10),
               // Explanation
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(10),
@@ -1716,249 +1710,254 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                 controller: controller,
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                 children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(Icons.receipt_long,
-                      color: colorScheme.primary, size: 24),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _receiptTitle(expense, aiResult, entry),
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: colorScheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Receipt · ${aiResult.items.length} items',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.receipt_long,
+                            color: colorScheme.primary, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _receiptTitle(expense, aiResult, entry),
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Receipt · ${aiResult.items.length} items',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: colorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
-            // Amount
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.overdue(context).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  '$cs${expense.amount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.overdue(context),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Store name header
-            if (aiResult.storeName != null &&
-                aiResult.storeName!.isNotEmpty) ...[
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.store,
-                        color: colorScheme.onPrimary, size: 18),
-                    const SizedBox(width: 8),
-                    Text(
-                      aiResult.storeName!,
-                      style: TextStyle(
-                        color: colorScheme.onPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                  // Amount
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.overdue(context).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$cs${expense.amount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.overdue(context),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-            ],
-
-            // Itemized table
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: colorScheme.outlineVariant),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  // Table header
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerLow,
-                      borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(11)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                            flex: 3,
-                            child: Text('ITEM',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onSurfaceVariant))),
-                        SizedBox(
-                            width: 40,
-                            child: Text('QTY',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onSurfaceVariant))),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                            width: 70,
-                            child: Text('PRICE',
-                                textAlign: TextAlign.right,
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onSurfaceVariant))),
-                      ],
-                    ),
                   ),
-                  // Item rows
-                  ...aiResult.items.asMap().entries.map((mapEntry) {
-                    final item = mapEntry.value;
-                    final isLast =
-                        mapEntry.key == aiResult.items.length - 1;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                  const SizedBox(height: 12),
+
+                  // Store name header
+                  if (aiResult.storeName != null &&
+                      aiResult.storeName!.isNotEmpty) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        border: isLast
-                            ? null
-                            : Border(
-                                bottom: BorderSide(
-                                    color: colorScheme
-                                        .surfaceContainerLow)),
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Expanded(
-                            flex: 3,
-                            child: Text(item.name,
-                                style: const TextStyle(fontSize: 14)),
-                          ),
-                          SizedBox(
-                            width: 40,
-                            child: Text('${item.quantity}',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    fontSize: 13,
-                                    color: colorScheme.onSurfaceVariant)),
-                          ),
+                          Icon(Icons.store,
+                              color: colorScheme.onPrimary, size: 18),
                           const SizedBox(width: 8),
-                          SizedBox(
-                            width: 70,
-                            child: Text(
-                              '$cs${item.totalPrice.toStringAsFixed(2)}',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600),
+                          Text(
+                            aiResult.storeName!,
+                            style: TextStyle(
+                              color: colorScheme.onPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
-                      ),
-                    );
-                  }),
-                  // Totals
-                  if (aiResult.subtotal != null ||
-                      aiResult.tax != null ||
-                      aiResult.total != null)
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerLow,
-                        borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(11)),
-                        border: Border(
-                            top: BorderSide(
-                                color: colorScheme.outlineVariant)),
-                      ),
-                      child: Column(
-                        children: [
-                          if (aiResult.subtotal != null)
-                            _receiptTotalRow('Subtotal',
-                                '$cs${aiResult.subtotal!.toStringAsFixed(2)}'),
-                          if (aiResult.tax != null)
-                            _receiptTotalRow('Tax',
-                                '$cs${aiResult.tax!.toStringAsFixed(2)}'),
-                          if (aiResult.total != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: _receiptTotalRow(
-                                'TOTAL',
-                                '$cs${aiResult.total!.toStringAsFixed(2)}',
-                                bold: true,
-                              ),
-                            ),
                         ],
                       ),
                     ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
+                    const SizedBox(height: 10),
+                  ],
 
-            // Details rows
-            _detailRow(Icons.calendar_today, 'Date',
-                DateFormat('EEEE, MMM d, y').format(expense.expenseDate)),
-            if (expense.vendor != null)
-              _detailRow(Icons.store, 'Vendor', expense.vendor!),
-            _detailRow(Icons.category, 'Category',
-                expense.category.displayName),
-            if (expense.paymentMethod != null)
-              _detailRow(Icons.payment, 'Payment',
-                  expense.paymentMethod!.displayName),
-            if (expense.hasReceipt)
-              _detailRow(Icons.attach_file, 'Receipt', 'Attached'),
-            if (expense.hasReceipt) const SizedBox(height: 8),
-            if (expense.hasReceipt) _buildReceiptPreview(context, expense),
-            const SizedBox(height: 12),
+                  // Itemized table
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: colorScheme.outlineVariant),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: [
+                        // Table header
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerLow,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(11)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                  flex: 3,
+                                  child: Text('ITEM',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color:
+                                              colorScheme.onSurfaceVariant))),
+                              SizedBox(
+                                  width: 40,
+                                  child: Text('QTY',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color:
+                                              colorScheme.onSurfaceVariant))),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                  width: 70,
+                                  child: Text('PRICE',
+                                      textAlign: TextAlign.right,
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color:
+                                              colorScheme.onSurfaceVariant))),
+                            ],
+                          ),
+                        ),
+                        // Item rows
+                        ...aiResult.items.asMap().entries.map((mapEntry) {
+                          final item = mapEntry.value;
+                          final isLast =
+                              mapEntry.key == aiResult.items.length - 1;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              border: isLast
+                                  ? null
+                                  : Border(
+                                      bottom: BorderSide(
+                                          color:
+                                              colorScheme.surfaceContainerLow)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Text(item.name,
+                                      style: const TextStyle(fontSize: 14)),
+                                ),
+                                SizedBox(
+                                  width: 40,
+                                  child: Text('${item.quantity}',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                          fontSize: 13,
+                                          color: colorScheme.onSurfaceVariant)),
+                                ),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                  width: 70,
+                                  child: Text(
+                                    '$cs${item.totalPrice.toStringAsFixed(2)}',
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                        // Totals
+                        if (aiResult.subtotal != null ||
+                            aiResult.tax != null ||
+                            aiResult.total != null)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerLow,
+                              borderRadius: const BorderRadius.vertical(
+                                  bottom: Radius.circular(11)),
+                              border: Border(
+                                  top: BorderSide(
+                                      color: colorScheme.outlineVariant)),
+                            ),
+                            child: Column(
+                              children: [
+                                if (aiResult.subtotal != null)
+                                  _receiptTotalRow('Subtotal',
+                                      '$cs${aiResult.subtotal!.toStringAsFixed(2)}'),
+                                if (aiResult.tax != null)
+                                  _receiptTotalRow('Tax',
+                                      '$cs${aiResult.tax!.toStringAsFixed(2)}'),
+                                if (aiResult.total != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: _receiptTotalRow(
+                                      'TOTAL',
+                                      '$cs${aiResult.total!.toStringAsFixed(2)}',
+                                      bold: true,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Details rows
+                  _detailRow(Icons.calendar_today, 'Date',
+                      DateFormat('EEEE, MMM d, y').format(expense.expenseDate)),
+                  if (expense.vendor != null)
+                    _detailRow(Icons.store, 'Vendor', expense.vendor!),
+                  _detailRow(
+                      Icons.category, 'Category', expense.category.displayName),
+                  if (expense.paymentMethod != null)
+                    _detailRow(Icons.payment, 'Payment',
+                        expense.paymentMethod!.displayName),
+                  if (expense.hasReceipt)
+                    _detailRow(Icons.attach_file, 'Receipt', 'Attached'),
+                  if (expense.hasReceipt) const SizedBox(height: 8),
+                  if (expense.hasReceipt)
+                    _buildReceiptPreview(context, expense),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -1993,7 +1992,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => _confirmDelete(ctx, expense),
-                        icon: Icon(Icons.delete, size: 18,
+                        icon: Icon(Icons.delete,
+                            size: 18,
                             color: Theme.of(context).colorScheme.error),
                         label: Text('Delete',
                             style: TextStyle(
@@ -2092,8 +2092,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
   /// Examples: "Plumbing supplies", "Deck install hardware"
   String _suggestCostEventTitle(ReceiptAiResult aiResult) {
     if (aiResult.items.isEmpty) return 'Purchased items';
-    final itemNames =
-        aiResult.items.map((i) => i.name.toLowerCase()).toList();
+    final itemNames = aiResult.items.map((i) => i.name.toLowerCase()).toList();
 
     // Look for common trade categories in the item names
     const categories = {
@@ -2154,339 +2153,344 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                 controller: controller,
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                 children: [
-            // Handle
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Header
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _getCategoryColor(expense.category)
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    _getCategoryIcon(expense.category),
-                    color: _getCategoryColor(expense.category),
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        expense.description,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        expense.category.displayName,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // Amount
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.overdue(context).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  '$cs${expense.amount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.overdue(context),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Linked expense banner
-            if (isLinked)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.paid(context).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: AppColors.paid(context).withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.link,
-                        size: 15, color: AppColors.paid(context)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Linked to an invoice material. Replaces the invoice estimate in totals.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.paid(context),
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Unassigned banner for expenses with no job
-            if (!isLinked && expense.jobId == null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade700.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: Colors.amber.shade700.withValues(alpha: 0.2),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.help_outline,
-                        size: 15, color: Colors.amber.shade700),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Not assigned to a job yet. Assign it, or keep it as a general business cost.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.amber.shade700,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-            // AI-Extracted Receipt Items Table
-            if (aiResult != null) ...[
-              if (aiResult.storeName != null &&
-                  aiResult.storeName!.isNotEmpty) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.store,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          size: 18),
-                      const SizedBox(width: 8),
-                      Text(
-                        aiResult.storeName!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-
-              // Itemized table
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                  // Handle
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
                       decoration: BoxDecoration(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .surfaceContainerLow,
-                        borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(11)),
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: _getCategoryColor(expense.category)
+                              .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          _getCategoryIcon(expense.category),
+                          color: _getCategoryColor(expense.category),
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              expense.description,
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              expense.category.displayName,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Amount
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.overdue(context).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        '$cs${expense.amount.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.overdue(context),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Linked expense banner
+                  if (isLinked)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.paid(context).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.paid(context).withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          Expanded(
-                              flex: 3,
-                              child: Text('ITEM',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant))),
-                          SizedBox(
-                              width: 40,
-                              child: Text('QTY',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant))),
+                          Icon(Icons.link,
+                              size: 15, color: AppColors.paid(context)),
                           const SizedBox(width: 8),
-                          SizedBox(
-                              width: 70,
-                              child: Text('PRICE',
-                                  textAlign: TextAlign.right,
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant))),
+                          Expanded(
+                            child: Text(
+                              'Linked to an invoice material. Replaces the invoice estimate in totals.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.paid(context),
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    ...aiResult.items.asMap().entries.map((mapEntry) {
-                      final item = mapEntry.value;
-                      final isLast =
-                          mapEntry.key == aiResult!.items.length - 1;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
+
+                  // Unassigned banner for expenses with no job
+                  if (!isLinked && expense.jobId == null)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade700.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.amber.shade700.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.help_outline,
+                              size: 15, color: Colors.amber.shade700),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Not assigned to a job yet. Assign it, or keep it as a general business cost.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.amber.shade700,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // AI-Extracted Receipt Items Table
+                  if (aiResult != null) ...[
+                    if (aiResult.storeName != null &&
+                        aiResult.storeName!.isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          border: isLast
-                              ? null
-                              : Border(
-                                  bottom: BorderSide(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .surfaceContainerLow)),
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: Row(
                           children: [
-                            Expanded(
-                              flex: 3,
-                              child: Text(item.name,
-                                  style: const TextStyle(fontSize: 14)),
-                            ),
-                            SizedBox(
-                              width: 40,
-                              child: Text('${item.quantity}',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant)),
-                            ),
+                            Icon(Icons.store,
+                                color: Theme.of(context).colorScheme.onPrimary,
+                                size: 18),
                             const SizedBox(width: 8),
-                            SizedBox(
-                              width: 70,
-                              child: Text(
-                                '$cs${item.totalPrice.toStringAsFixed(2)}',
-                                textAlign: TextAlign.right,
-                                style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600),
+                            Text(
+                              aiResult.storeName!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    }),
-                    if (aiResult.subtotal != null ||
-                        aiResult.tax != null ||
-                        aiResult.total != null)
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerLow,
-                          borderRadius: const BorderRadius.vertical(
-                              bottom: Radius.circular(11)),
-                          border: Border(
-                              top: BorderSide(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .outlineVariant)),
-                        ),
-                        child: Column(
-                          children: [
-                            if (aiResult.subtotal != null)
-                              _receiptTotalRow('Subtotal',
-                                  '$cs${aiResult.subtotal!.toStringAsFixed(2)}'),
-                            if (aiResult.tax != null)
-                              _receiptTotalRow('Tax',
-                                  '$cs${aiResult.tax!.toStringAsFixed(2)}'),
-                            if (aiResult.total != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: _receiptTotalRow(
-                                  'TOTAL',
-                                  '$cs${aiResult.total!.toStringAsFixed(2)}',
-                                  bold: true,
-                                ),
-                              ),
                           ],
                         ),
                       ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
+                      const SizedBox(height: 10),
+                    ],
 
-            // Details rows
-            _detailRow(Icons.calendar_today, 'Date',
-                dateFormat.format(expense.expenseDate)),
-            if (expense.vendor != null)
-              _detailRow(Icons.store, 'Vendor', expense.vendor!),
-            if (expense.paymentMethod != null)
-              _detailRow(Icons.payment, 'Payment',
-                  expense.paymentMethod!.displayName),
-            _detailRow(
-              expense.taxDeductible ? Icons.check_circle : Icons.cancel,
-              'Tax Deductible',
-              expense.taxDeductible ? 'Yes' : 'No',
-              color: expense.taxDeductible
-                  ? AppColors.paid(context)
-                  : Theme.of(context).colorScheme.error,
-            ),
-            if (expense.hasReceipt)
-              _detailRow(Icons.attach_file, 'Receipt', 'Attached'),
-            if (expense.hasReceipt) const SizedBox(height: 8),
-            if (expense.hasReceipt) _buildReceiptPreview(context, expense),
-            const SizedBox(height: 12),
+                    // Itemized table
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color:
+                                Theme.of(context).colorScheme.outlineVariant),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerLow,
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(11)),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                    flex: 3,
+                                    child: Text('ITEM',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant))),
+                                SizedBox(
+                                    width: 40,
+                                    child: Text('QTY',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant))),
+                                const SizedBox(width: 8),
+                                SizedBox(
+                                    width: 70,
+                                    child: Text('PRICE',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w800,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant))),
+                              ],
+                            ),
+                          ),
+                          ...aiResult.items.asMap().entries.map((mapEntry) {
+                            final item = mapEntry.value;
+                            final isLast =
+                                mapEntry.key == aiResult!.items.length - 1;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                border: isLast
+                                    ? null
+                                    : Border(
+                                        bottom: BorderSide(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .surfaceContainerLow)),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(item.name,
+                                        style: const TextStyle(fontSize: 14)),
+                                  ),
+                                  SizedBox(
+                                    width: 40,
+                                    child: Text('${item.quantity}',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            fontSize: 13,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  SizedBox(
+                                    width: 70,
+                                    child: Text(
+                                      '$cs${item.totalPrice.toStringAsFixed(2)}',
+                                      textAlign: TextAlign.right,
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          if (aiResult.subtotal != null ||
+                              aiResult.tax != null ||
+                              aiResult.total != null)
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceContainerLow,
+                                borderRadius: const BorderRadius.vertical(
+                                    bottom: Radius.circular(11)),
+                                border: Border(
+                                    top: BorderSide(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .outlineVariant)),
+                              ),
+                              child: Column(
+                                children: [
+                                  if (aiResult.subtotal != null)
+                                    _receiptTotalRow('Subtotal',
+                                        '$cs${aiResult.subtotal!.toStringAsFixed(2)}'),
+                                  if (aiResult.tax != null)
+                                    _receiptTotalRow('Tax',
+                                        '$cs${aiResult.tax!.toStringAsFixed(2)}'),
+                                  if (aiResult.total != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: _receiptTotalRow(
+                                        'TOTAL',
+                                        '$cs${aiResult.total!.toStringAsFixed(2)}',
+                                        bold: true,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Details rows
+                  _detailRow(Icons.calendar_today, 'Date',
+                      dateFormat.format(expense.expenseDate)),
+                  if (expense.vendor != null)
+                    _detailRow(Icons.store, 'Vendor', expense.vendor!),
+                  if (expense.paymentMethod != null)
+                    _detailRow(Icons.payment, 'Payment',
+                        expense.paymentMethod!.displayName),
+                  _detailRow(
+                    expense.taxDeductible ? Icons.check_circle : Icons.cancel,
+                    'Tax Deductible',
+                    expense.taxDeductible ? 'Yes' : 'No',
+                    color: expense.taxDeductible
+                        ? AppColors.paid(context)
+                        : Theme.of(context).colorScheme.error,
+                  ),
+                  if (expense.hasReceipt)
+                    _detailRow(Icons.attach_file, 'Receipt', 'Attached'),
+                  if (expense.hasReceipt) const SizedBox(height: 8),
+                  if (expense.hasReceipt)
+                    _buildReceiptPreview(context, expense),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -2522,7 +2526,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () =>
                             _confirmDelete(ctx, expense, isLinked: isLinked),
-                        icon: Icon(Icons.delete, size: 18,
+                        icon: Icon(Icons.delete,
+                            size: 18,
                             color: Theme.of(context).colorScheme.error),
                         label: Text('Delete',
                             style: TextStyle(
@@ -2573,28 +2578,23 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
     );
   }
 
-  Widget _detailRow(IconData icon, String label, String value,
-      {Color? color}) {
+  Widget _detailRow(IconData icon, String label, String value, {Color? color}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon,
               size: 18,
-              color: color ??
-                  Theme.of(context).colorScheme.onSurfaceVariant),
+              color: color ?? Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(width: 10),
           Text(label,
               style: TextStyle(
-                  color:
-                      Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 13)),
           const Spacer(),
           Text(value,
               style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: color)),
+                  fontWeight: FontWeight.w600, fontSize: 13, color: color)),
         ],
       ),
     );
@@ -2636,16 +2636,14 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
         ),
         const SizedBox(height: 8),
         InkWell(
-          onTap: () =>
-              _openReceiptViewer(context, receiptUrl, receiptPath),
+          onTap: () => _openReceiptViewer(context, receiptUrl, receiptPath),
           borderRadius: BorderRadius.circular(12),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: double.infinity,
               height: 170,
-              color:
-                  Theme.of(context).colorScheme.surfaceContainerLow,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               child: image,
             ),
           ),
@@ -2662,9 +2660,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
             ),
             const SizedBox(width: 6),
             Text(
-              hasUrl
-                  ? 'Backed up to cloud storage'
-                  : 'Stored on this device',
+              hasUrl ? 'Backed up to cloud storage' : 'Stored on this device',
               style: TextStyle(
                 fontSize: 12,
                 color: hasUrl
@@ -2783,10 +2779,8 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                        content: const Text(
-                            'Delete failed. Please try again.'),
-                        backgroundColor:
-                            Theme.of(context).colorScheme.error),
+                        content: const Text('Delete failed. Please try again.'),
+                        backgroundColor: Theme.of(context).colorScheme.error),
                   );
                 }
               }
@@ -2886,16 +2880,16 @@ class _DisplayRow {
       : children = null,
         linkedEntries = null;
 
-  _DisplayRow.group(List<CostLedgerEntry> this.children,
-      {this.linkedEntries})
+  _DisplayRow.group(List<CostLedgerEntry> this.children, {this.linkedEntries})
       : entry = null;
 
   bool get isGroup => children != null && children!.length > 1;
 
   DateTime get displayDate {
     if (isGroup) {
-      return children!.map((c) => c.date).reduce(
-          (a, b) => a.isAfter(b) ? a : b);
+      return children!
+          .map((c) => c.date)
+          .reduce((a, b) => a.isAfter(b) ? a : b);
     }
     return entry!.date;
   }
@@ -2911,10 +2905,8 @@ class _DisplayRow {
       isGroup ? children!.first.invoiceNumber : entry!.invoiceNumber;
   String? get clientName =>
       isGroup ? children!.first.clientName : entry!.clientName;
-  String? get jobName =>
-      isGroup ? children!.first.jobName : entry!.jobName;
-  String? get jobId =>
-      isGroup ? children!.first.jobId : entry!.jobId;
+  String? get jobName => isGroup ? children!.first.jobName : entry!.jobName;
+  String? get jobId => isGroup ? children!.first.jobId : entry!.jobId;
 
   int get estimatedCount => isGroup
       ? children!.where((c) => c.isEstimated).length

@@ -40,6 +40,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     }
   }
 
+  Future<void> _openAssistant(BuildContext context, WidgetRef ref) async {
+    final notifier = ref.read(aiAssistantProvider.notifier);
+    final result = await showAiAssistantOverlay(
+      context,
+      notifier: notifier,
+    );
+
+    if (result != null && context.mounted) {
+      await ref.read(aiActionCoordinatorProvider).execute(context, result);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedIndex = ref.watch(bottomNavIndexProvider);
@@ -57,14 +69,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
               return _tabs[index] ?? const SizedBox.shrink();
             }),
           ),
-          // AI mic button — positioned above screen-specific FABs
-          // so they never overlap. Only hidden on Home (which has its
-          // own "Start with voice" card).
+
+          // ── AI mic button — bottom LEFT ──
+          // Positioned on the left so it never conflicts with
+          // screen-specific FABs (add expense, add client) on the right.
+          // Hidden on Home which has its own "Start with voice" card.
           if (selectedIndex != 0)
-            const Positioned(
-              right: 20,
-              bottom: 84,
-              child: _AiAssistantFab(),
+            Positioned(
+              left: 20,
+              bottom: 20,
+              child: _AiAssistantFab(
+                onTap: () => _openAssistant(context, ref),
+              ),
             ),
         ],
       ),
@@ -114,34 +130,23 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   }
 }
 
-class _AiAssistantFab extends ConsumerWidget {
-  const _AiAssistantFab();
+class _AiAssistantFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AiAssistantFab({required this.onTap});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return FloatingActionButton.small(
+    return FloatingActionButton(
       key: const ValueKey('ai_assistant_fab'),
       heroTag: 'ai_assistant',
       elevation: 2,
       tooltip: 'Ask AI',
       backgroundColor: colorScheme.primary,
       shape: const CircleBorder(),
-      onPressed: () => _openAssistant(context, ref),
-      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 20),
+      onPressed: onTap,
+      child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
     );
-  }
-
-  Future<void> _openAssistant(BuildContext context, WidgetRef ref) async {
-    final notifier = ref.read(aiAssistantProvider.notifier);
-    final result = await showAiAssistantOverlay(
-      context,
-      notifier: notifier,
-    );
-
-    if (result != null && context.mounted) {
-      await ref.read(aiActionCoordinatorProvider).execute(context, result);
-    }
   }
 }
