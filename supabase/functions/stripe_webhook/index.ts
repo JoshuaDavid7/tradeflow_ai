@@ -289,7 +289,16 @@ Deno.serve(async (req) => {
     if (marksPaid) {
       update.payment_status = "paid";
       update.payment_paid_at = new Date().toISOString();
-      update.status = "paid";
+      update.paid_at = new Date().toISOString();
+
+      // Update financial fields: mark invoice as fully paid.
+      // Stripe checkout sessions are full-amount payments, so
+      // amount_paid = total and amount_due = 0.
+      if (amountTotal != null) {
+        const totalMajor = amountTotal / 100;
+        update.amount_paid = totalMajor;
+        update.amount_due = 0;
+      }
     } else if (marksFailed) {
       update.payment_status = "failed";
     } else if (marksExpired) {
