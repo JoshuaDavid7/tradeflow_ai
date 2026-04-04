@@ -6,21 +6,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:tradeflow_ai/domain/models/receipt.dart' as domain_receipt;
-import 'package:tradeflow_ai/data/services/voice_capture_service.dart';
 import 'package:tradeflow_ai/domain/models/job.dart' hide Material;
 import 'package:tradeflow_ai/presentation/providers/job_provider.dart';
 import 'package:tradeflow_ai/presentation/providers/profile_provider.dart';
 import 'package:tradeflow_ai/presentation/providers/analytics_provider.dart';
 import 'package:tradeflow_ai/presentation/providers/expense_provider.dart';
-import 'package:tradeflow_ai/presentation/providers/voice_provider.dart';
-import 'package:tradeflow_ai/presentation/widgets/voice_recording_button.dart';
 import 'package:uuid/uuid.dart';
 import 'package:tradeflow_ai/presentation/widgets/shimmer_loading.dart';
 import 'package:tradeflow_ai/core/theme/app_theme.dart';
 import 'package:tradeflow_ai/data/services/supabase_service.dart';
 import 'package:tradeflow_ai/data/services/demo_data_service.dart';
 import 'package:tradeflow_ai/presentation/providers/customer_ledger_provider.dart';
-import 'main_shell_screen.dart';
+import '../providers/ai_assistant_provider.dart';
+import '../providers/navigation_provider.dart';
+import '../services/ai_action_coordinator.dart';
+import '../widgets/ai_assistant_overlay.dart';
 import '../../screens/draft_review_screen.dart';
 import '../../screens/pdf_preview_screen.dart';
 import '../../screens/settings_screen.dart';
@@ -64,12 +64,9 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
   /// e.g. "1 draft · 2 invoices awaiting payment"
   String _attentionSubtitle(JobListState jobState) {
     if (jobState.isLoading) return '';
-    final awaiting = jobState.jobs
-        .where((j) => j.isAwaitingPayment)
-        .toList();
-    final drafts = jobState.jobs
-        .where((j) => j.status == JobStatus.draft)
-        .toList();
+    final awaiting = jobState.jobs.where((j) => j.isAwaitingPayment).toList();
+    final drafts =
+        jobState.jobs.where((j) => j.status == JobStatus.draft).toList();
     final parts = <String>[];
     if (drafts.length == 1) parts.add('1 draft');
     if (drafts.length > 1) parts.add('${drafts.length} drafts');
@@ -89,54 +86,6 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
     final currencySymbol = ref.watch(currencySymbolProvider);
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-
-    // ── Auto-dismiss voice errors & stale processing states ──
-    ref.listen<VoiceCaptureProgress>(voiceCaptureProvider, (prev, next) {
-      if (next.state == VoiceCaptureState.error &&
-          (next.error?.trim().isNotEmpty ?? false)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 18),
-                const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    'Something went wrong. Try again.',
-                    style: TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 4),
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          ),
-        );
-        // Reset voice state after showing error
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            ref.read(voiceCaptureProvider.notifier).reset();
-          }
-        });
-      }
-
-      // Auto-reset stale processing states (stuck > 60s)
-      if (next.isActive &&
-          next.state != VoiceCaptureState.recording &&
-          prev?.state == next.state) {
-        Future.delayed(const Duration(seconds: 60), () {
-          if (mounted) {
-            final current = ref.read(voiceCaptureProvider);
-            if (current.state == next.state) {
-              ref.read(voiceCaptureProvider.notifier).reset();
-            }
-          }
-        });
-      }
-    });
 
     return Scaffold(
       body: RefreshIndicator(
@@ -239,10 +188,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
 
                   // ── 3. Start with Voice ──
                   RepaintBoundary(
-                    child: Consumer(builder: (context, ref, _) {
-                      final voiceProgress = ref.watch(voiceCaptureProvider);
-                      return _buildVoiceSection(context, voiceProgress, colorScheme);
-                    }),
+                    child: _buildVoiceSection(context, colorScheme),
                   ),
                   const SizedBox(height: 26),
 
@@ -250,7 +196,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                   RepaintBoundary(
                     child: Consumer(builder: (context, ref, _) {
                       final jobState = ref.watch(jobListProvider);
-                      return _buildUrgentSection(context, currencySymbol, jobState);
+                      return _buildUrgentSection(
+                          context, currencySymbol, jobState);
                     }),
                   ),
 
@@ -258,7 +205,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                   RepaintBoundary(
                     child: Consumer(builder: (context, ref, _) {
                       final jobState = ref.watch(jobListProvider);
-                      return _buildRecentJobs(context, currencySymbol, jobState);
+                      return _buildRecentJobs(
+                          context, currencySymbol, jobState);
                     }),
                   ),
                   const SizedBox(height: 100),
@@ -318,7 +266,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                     Row(
                       children: [
                         Icon(Icons.schedule_rounded,
-                            color: Colors.white.withValues(alpha: 0.8), size: 13),
+                            color: Colors.white.withValues(alpha: 0.8),
+                            size: 13),
                         const SizedBox(width: 4),
                         Text(
                           'Awaiting payment',
@@ -342,13 +291,14 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
               ),
               Consumer(builder: (context, ref, _) {
                 final jobState = ref.watch(jobListProvider);
-                final sentCount = jobState.jobs
-                    .where((j) => j.status == JobStatus.sent)
+                final outstandingCount = jobState.jobs
+                    .where((j) => j.isAwaitingPayment)
                     .length;
                 return GestureDetector(
                   onTap: () {
-                    // Navigate to Jobs tab → Sent tab
+                    // Navigate to Jobs tab → Sent tab (outstanding only)
                     ref.read(historyInitialTabProvider.notifier).state = 2;
+                    ref.read(historyOutstandingFilterProvider.notifier).state = true;
                     ref.read(bottomNavIndexProvider.notifier).state = 1;
                   },
                   child: Container(
@@ -361,11 +311,12 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.send_rounded,
-                            color: Colors.white.withValues(alpha: 0.9), size: 15),
+                        Icon(Icons.schedule_rounded,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            size: 15),
                         const SizedBox(width: 6),
                         Text(
-                          '$sentCount sent',
+                          '$outstandingCount unpaid',
                           style: textTheme.labelMedium?.copyWith(
                             color: Colors.white.withValues(alpha: 0.9),
                             fontWeight: FontWeight.w600,
@@ -391,7 +342,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.calendar_month, color: Colors.white.withValues(alpha: 0.75), size: 14),
+                Icon(Icons.calendar_month,
+                    color: Colors.white.withValues(alpha: 0.75), size: 14),
                 const SizedBox(width: 4),
                 Text(
                   _isCurrentMonth
@@ -402,7 +354,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Icon(Icons.keyboard_arrow_down, color: Colors.white.withValues(alpha: 0.75), size: 16),
+                Icon(Icons.keyboard_arrow_down,
+                    color: Colors.white.withValues(alpha: 0.75), size: 16),
               ],
             ),
           ),
@@ -617,7 +570,10 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => DraftReviewScreen(
-                              jobData: const {'type': 'invoice', 'materials': []},
+                              jobData: const {
+                                'type': 'invoice',
+                                'materials': []
+                              },
                             ),
                           ),
                         );
@@ -700,8 +656,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                       builder: (_) => const ReceiptScannerScreen(),
                     ),
                   );
-                  if (!mounted ||
-                      scannedReceipt is! domain_receipt.Receipt) {
+                  if (!mounted || scannedReceipt is! domain_receipt.Receipt) {
                     return;
                   }
                   // Route through shared scan result router
@@ -851,13 +806,15 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                       height: 4,
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                        color:
+                            colorScheme.outlineVariant.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                     Text(
                       'Create note for',
-                      style: AppTextStyles.sheetTitle(Theme.of(context).textTheme),
+                      style:
+                          AppTextStyles.sheetTitle(Theme.of(context).textTheme),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -878,13 +835,14 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                             // "New Client" option — inline creation
                             return ListTile(
                               leading: CircleAvatar(
-                                backgroundColor:
-                                    colorScheme.primaryContainer.withValues(alpha: 0.5),
+                                backgroundColor: colorScheme.primaryContainer
+                                    .withValues(alpha: 0.5),
                                 child: Icon(Icons.add_rounded,
                                     color: colorScheme.primary, size: 20),
                               ),
                               title: const Text('New client',
-                                  style: TextStyle(fontWeight: FontWeight.w700)),
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.w700)),
                               subtitle: const Text('Create and start a note'),
                               onTap: () {
                                 Navigator.pop(ctx);
@@ -906,7 +864,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                             ),
                             title: Text(
                               c['name'] ?? 'Unknown',
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.w700),
                             ),
                             onTap: () {
                               Navigator.pop(ctx);
@@ -960,7 +919,9 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.fromLTRB(
-          24, 16, 24,
+          24,
+          16,
+          24,
           MediaQuery.of(ctx).viewInsets.bottom + 24,
         ),
         child: Column(
@@ -984,8 +945,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
             Text(
               'Enter a name and we\u2019ll open the note editor',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+                    color: colorScheme.onSurfaceVariant,
+                  ),
             ),
             const SizedBox(height: 20),
             TextField(
@@ -1069,161 +1030,108 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
 
   Widget _buildVoiceSection(
     BuildContext context,
-    VoiceCaptureProgress voiceProgress,
     ColorScheme colorScheme,
   ) {
     final textTheme = Theme.of(context).textTheme;
-    final isRecording = voiceProgress.state == VoiceCaptureState.recording;
-    // Guard: disable tap while the voice pipeline is processing (upload/transcribe/extract)
-    final isProcessing = voiceProgress.isActive && !isRecording;
-
-    return Column(
-      children: [
-        Material(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: isProcessing ? null : () async {
-              unawaited(HapticFeedback.mediumImpact());
-              final notifier = ref.read(voiceCaptureProvider.notifier);
-              if (isRecording) {
-                try {
-                  final result = await notifier.stopAndProcess();
-                  if (result != null && mounted) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => DraftReviewScreen(
-                          jobData: result.extractedData,
-                        ),
-                      ),
-                    );
-                  } else if (mounted) {
-                    final progress = ref.read(voiceCaptureProvider);
-                    final errorMsg = progress.error ?? 'Voice processing failed. Please try again.';
-                    showDialog(context: context, builder: (_) => AlertDialog(
-                      title: const Text('Voice Error'),
-                      content: SelectableText(errorMsg),
-                      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
-                    ));
-                    notifier.reset();
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    showDialog(context: context, builder: (_) => AlertDialog(
-                      title: const Text('Voice Error'),
-                      content: SelectableText('$e'),
-                      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
-                    ));
-                    notifier.reset();
-                  }
-                }
-              } else {
-                await notifier.startRecording();
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isRecording
-                      ? colorScheme.error.withValues(alpha: 0.6)
-                      : colorScheme.outlineVariant.withValues(alpha: 0.4),
-                  width: isRecording ? 1.5 : 0.5,
+    return Material(
+      key: const ValueKey('home_voice_launcher'),
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () async {
+          unawaited(HapticFeedback.mediumImpact());
+          final result = await showAiAssistantOverlay(
+            context,
+            notifier: ref.read(aiAssistantProvider.notifier),
+          );
+          if (!mounted || result == null) {
+            return;
+          }
+          await ref.read(aiActionCoordinatorProvider).execute(context, result);
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+              width: 0.8,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.graphic_eq_rounded,
+                  color: colorScheme.primary,
+                  size: 28,
                 ),
               ),
-              child: Row(
-                children: [
-                  // Mic icon container
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isRecording
-                          ? colorScheme.error.withValues(alpha: 0.12)
-                          : colorScheme.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: isRecording ? colorScheme.error : colorScheme.primary,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Text
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        Text(
-                          isRecording ? 'Tap to stop recording' : 'Start with voice',
-                          style: textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: isRecording ? colorScheme.error : null,
+                        Expanded(
+                          child: Text(
+                            'Start with voice',
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isRecording
-                              ? 'Listening...'
-                              : 'Describe a job and we\u2019ll draft it',
-                          style: textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer
+                                .withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'AI',
+                            style: textTheme.labelSmall?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.4,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  // Arrow / recording indicator
-                  if (!isRecording)
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-                      size: 14,
-                    ),
-                  if (isRecording)
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: colorScheme.error,
-                        shape: BoxShape.circle,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Draft jobs, log expenses, record payments, or ask a question',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.35,
                       ),
                     ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(width: 10),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
+                size: 14,
+              ),
+            ],
           ),
         ),
-        // Voice processing indicator (below the card) — tappable to dismiss
-        if (voiceProgress.isActive && !isRecording) ...[
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () {
-              ref.read(voiceCaptureProvider.notifier).reset();
-            },
-            child: Stack(
-              children: [
-                VoiceProcessingIndicator(progress: voiceProgress),
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
@@ -1240,8 +1148,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
         job.isPartiallyPaid ? 'partially paid' : 'awaiting payment';
 
     if (job.dueDate != null) {
-      final due = DateTime(
-          job.dueDate!.year, job.dueDate!.month, job.dueDate!.day);
+      final due =
+          DateTime(job.dueDate!.year, job.dueDate!.month, job.dueDate!.day);
       if (due.isBefore(today)) return 'Invoice \u00b7 overdue';
       if (due.isAtSameMomentAs(today)) return 'Invoice \u00b7 due today';
       final daysLeft = due.difference(today).inDays;
@@ -1259,9 +1167,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
     if (jobState.isLoading) return const SizedBox.shrink();
 
     // Urgent = sent invoices with outstanding balance (quotes excluded)
-    final urgentJobs = jobState.jobs
-        .where((j) => j.isAwaitingPayment)
-        .toList();
+    final urgentJobs = jobState.jobs.where((j) => j.isAwaitingPayment).toList();
 
     if (urgentJobs.isEmpty) return const SizedBox.shrink();
 
@@ -1271,20 +1177,18 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(context, 'Urgent',
-            onSeeAll: () {
-              ref.read(historyInitialTabProvider.notifier).state = 2;
-              ref.read(bottomNavIndexProvider.notifier).state = 1;
-            }),
+        _buildSectionHeader(context, 'Urgent', onSeeAll: () {
+          ref.read(historyInitialTabProvider.notifier).state = 2;
+          ref.read(bottomNavIndexProvider.notifier).state = 1;
+        }),
         const SizedBox(height: 10),
         ...urgentJobs.take(3).map((job) {
-          final isOverdue = job.dueDate != null &&
-              job.dueDate!.isBefore(DateTime.now());
+          final isOverdue =
+              job.dueDate != null && job.dueDate!.isBefore(DateTime.now());
           final subtitle = _urgentCardSubtitle(job);
 
-          final accentColor = isOverdue
-              ? AppColors.overdue(context)
-              : AppColors.sent(context);
+          final accentColor =
+              isOverdue ? AppColors.overdue(context) : AppColors.sent(context);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 6),
@@ -1296,8 +1200,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                 onTap: () => _openRecentJob(context, job),
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 14),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   decoration: BoxDecoration(
                     border: Border(
                       left: BorderSide(
@@ -1354,9 +1258,7 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                       Text(
                         '$currencySymbol${job.amountDue.toStringAsFixed(0)}',
                         style: AppTextStyles.cardAmount(textTheme).copyWith(
-                          color: isOverdue
-                              ? AppColors.overdue(context)
-                              : null,
+                          color: isOverdue ? AppColors.overdue(context) : null,
                         ),
                       ),
                     ],
@@ -1375,7 +1277,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
   // RECENT JOBS — Polished cards, prefer job title over client name dupe
   // ═══════════════════════════════════════════════════════════════════════════
 
-  Widget _buildRecentJobs(BuildContext context, String currencySymbol, JobListState jobState) {
+  Widget _buildRecentJobs(
+      BuildContext context, String currencySymbol, JobListState jobState) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
@@ -1383,7 +1286,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionHeader(context, 'Recent Jobs',
-            onSeeAll: () => ref.read(bottomNavIndexProvider.notifier).state = 1),
+            onSeeAll: () =>
+                ref.read(bottomNavIndexProvider.notifier).state = 1),
         const SizedBox(height: 10),
         if (jobState.isLoading)
           ...List.generate(
@@ -1523,14 +1427,15 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title,
-            style: AppTextStyles.sectionHeader(textTheme)),
+        Text(title, style: AppTextStyles.sectionHeader(textTheme)),
         TextButton(
           onPressed: onSeeAll,
           style: TextButton.styleFrom(
-            foregroundColor: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            foregroundColor:
+                colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            textStyle:
+                const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
           child: const Text('See All'),
         ),
@@ -1645,8 +1550,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
           _firstStepRow(context, Icons.mic, 'Record a voice memo',
               'Describe a job — AI creates the invoice'),
           const SizedBox(height: 10),
-          _firstStepRow(context, Icons.receipt_long, 'Create an invoice or quote',
-              'Tap + Create above'),
+          _firstStepRow(context, Icons.receipt_long,
+              'Create an invoice or quote', 'Tap + Create above'),
           const SizedBox(height: 10),
           _firstStepRow(context, Icons.document_scanner, 'Scan a receipt',
               'AI extracts line items and costs'),
@@ -1740,7 +1645,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                   height: 4,
                   margin: const EdgeInsets.only(top: 8, bottom: 16),
                   decoration: BoxDecoration(
-                    color: sheetColorScheme.outlineVariant.withValues(alpha: 0.5),
+                    color:
+                        sheetColorScheme.outlineVariant.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1758,10 +1664,13 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                       final month = months[index];
                       final isSelected = month.year == _selectedMonth.year &&
                           month.month == _selectedMonth.month;
-                      final isCurrent = month.year == now.year && month.month == now.month;
+                      final isCurrent =
+                          month.year == now.year && month.month == now.month;
                       return ListTile(
                         leading: Icon(
-                          isSelected ? Icons.check_circle : Icons.circle_outlined,
+                          isSelected
+                              ? Icons.check_circle
+                              : Icons.circle_outlined,
                           color: isSelected
                               ? sheetColorScheme.primary
                               : sheetColorScheme.outlineVariant,
@@ -1772,7 +1681,8 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                               ? '${DateFormat('MMMM yyyy').format(month)} (Current)'
                               : DateFormat('MMMM yyyy').format(month),
                           style: TextStyle(
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
                           ),
                         ),
                         onTap: () {
@@ -1780,8 +1690,12 @@ class _DashboardScreenNewState extends ConsumerState<DashboardScreenNew> {
                           Navigator.pop(ctx);
                           // Sync with the global analytics month so the
                           // Analytics tab shows the same period.
-                          ref.read(selectedAnalyticsMonthProvider.notifier).state = month;
-                          ref.read(analyticsProvider.notifier).loadAnalytics(month: month);
+                          ref
+                              .read(selectedAnalyticsMonthProvider.notifier)
+                              .state = month;
+                          ref
+                              .read(analyticsProvider.notifier)
+                              .loadAnalytics(month: month);
                         },
                       );
                     },
