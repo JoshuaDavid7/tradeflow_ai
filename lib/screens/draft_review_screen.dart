@@ -1522,44 +1522,58 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                             itemCount: filtered.length,
                             itemBuilder: (_, i) {
                               final c = filtered[i];
-                              return ListTile(
-                                leading: CircleAvatar(
-                                  backgroundColor: Theme.of(context)
-                                      .colorScheme
-                                      .primaryContainer,
-                                  child: Text(
-                                    ((c['name'] ?? '?').toString().isEmpty
-                                            ? '?'
-                                            : (c['name'] ?? '?').toString())[0]
-                                        .toUpperCase(),
-                                    style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onPrimaryContainer,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                title: Text(c['name'] ?? 'Unknown',
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w600)),
-                                subtitle: Text(
-                                  [
-                                    if (c['phone'] != null) c['phone'],
-                                    if (c['email'] != null) c['email'],
-                                  ].join(' \u2022 '),
-                                  style: TextStyle(
-                                      fontSize: 12,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant),
-                                ),
+                              final name = (c['name'] ?? 'Unknown').toString();
+                              final initial = name.isEmpty ? '?' : name[0].toUpperCase();
+                              final details = [
+                                if (c['phone'] != null && c['phone'].toString().isNotEmpty) c['phone'],
+                                if (c['email'] != null && c['email'].toString().isNotEmpty) c['email'],
+                              ].join(' \u2022 ');
+                              return InkWell(
                                 onTap: () {
                                   _selectCustomer(c);
                                   Navigator.pop(ctx);
                                 },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 20,
+                                        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                                        child: Text(initial,
+                                            style: TextStyle(
+                                              color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            )),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Text(name,
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                                style: const TextStyle(
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 15)),
+                                            if (details.isNotEmpty) ...[
+                                              const SizedBox(height: 2),
+                                              Text(details,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               );
                             },
                           ),
