@@ -131,6 +131,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     _descCtrl.addListener(markDirty);
     _laborHoursCtrl.addListener(markDirty);
     _markupCtrl.addListener(markDirty);
+
   }
 
   List<Map<String, dynamic>> _customers = [];
@@ -219,6 +220,114 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     if (value is num) return value.toInt();
     if (value == null) return null;
     return int.tryParse(value.toString());
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value == null) return null;
+    return double.tryParse(value.toString());
+  }
+
+  String _normalizeMaterialName(dynamic value) {
+    return value?.toString().trim().toLowerCase() ?? '';
+  }
+
+  String _normalizeMatchText(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('&', ' and ')
+        .replaceAll(RegExp(r'[^a-z0-9\s]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  int _levenshteinDistance(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+
+    final costs = List<int>.generate(b.length + 1, (index) => index);
+    for (var i = 1; i <= a.length; i++) {
+      var previous = costs[0];
+      costs[0] = i;
+      for (var j = 1; j <= b.length; j++) {
+        final current = costs[j];
+        final substitutionCost = a[i - 1] == b[j - 1] ? 0 : 1;
+        costs[j] = [
+          costs[j] + 1,
+          costs[j - 1] + 1,
+          previous + substitutionCost,
+        ].reduce((left, right) => left < right ? left : right);
+        previous = current;
+      }
+    }
+    return costs[b.length];
+  }
+
+  void _syncCustomerLinkFromClientName() {
+    if (_customers.isEmpty) {
+      return;
+    }
+
+    final originalClientName = _clientCtrl.text.trim();
+    final clientName = _normalizeMatchText(originalClientName);
+    if (clientName.isEmpty) {
+      _editableData.remove('customer_id');
+      _editableData.remove('customerId');
+      return;
+    }
+
+    Map<String, dynamic>? bestMatch;
+    var bestScore = 999;
+
+    for (final customer in _customers) {
+      final rawName = (customer['name'] ?? '').toString().trim();
+      final name = _normalizeMatchText(rawName);
+      if (name.isEmpty) {
+        continue;
+      }
+
+      var score = 999;
+      if (name == clientName) {
+        score = 0;
+      } else if (name.contains(clientName) || clientName.contains(name)) {
+        score = 1;
+      } else {
+        final distance = _levenshteinDistance(name, clientName);
+        final maxLength =
+            name.length > clientName.length ? name.length : clientName.length;
+        if (distance <= 2 || distance <= (maxLength / 4).round()) {
+          score = 2 + distance;
+        }
+      }
+
+      if (score < bestScore) {
+        bestScore = score;
+        bestMatch = customer;
+      }
+    }
+
+    if (bestMatch != null && bestScore <= 4) {
+      _editableData['customer_id'] = bestMatch['id'];
+      _editableData['customerId'] = bestMatch['id'];
+
+      final correctedName = (bestMatch['name'] ?? '').toString().trim();
+      if (correctedName.isNotEmpty &&
+          correctedName != originalClientName &&
+          bestScore > 0) {
+        _clientCtrl.value = _clientCtrl.value.copyWith(
+          text: correctedName,
+          selection: TextSelection.collapsed(offset: correctedName.length),
+          composing: TextRange.empty,
+        );
+        _editableData['clientName'] = correctedName;
+      }
+      return;
+    }
+
+    _editableData.remove('customer_id');
+    _editableData.remove('customerId');
   }
 
   String _sanitizeInvoicePrefix(String? rawPrefix) {
@@ -443,6 +552,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     _editableData['invoice_number'] = _invoiceNumberCtrl.text.trim();
     _editableData['description'] = _descCtrl.text.trim();
     _editableData['laborHours'] = double.tryParse(_laborHoursCtrl.text) ?? 0.0;
+    _syncCustomerLinkFromClientName();
   }
 
   Map<String, dynamic> _buildCurrentPdfData() {
@@ -1036,10 +1146,11 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     // placeholder so the QR/link section renders in the preview.
     final isQuote = (_editableData['type']?.toString() ?? 'invoice') == 'quote';
     if (!isQuote && _includeStripePayment) {
-      final existingUrl =
-          (liveData['payment_checkout_url'] ?? liveData['securePaymentUrl'] ?? '')
-              .toString()
-              .trim();
+      final existingUrl = (liveData['payment_checkout_url'] ??
+              liveData['securePaymentUrl'] ??
+              '')
+          .toString()
+          .trim();
       if (existingUrl.isEmpty) {
         liveData['securePaymentUrl'] = 'https://checkout.stripe.com/preview';
       }
@@ -2260,45 +2371,60 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     final type = _editableData['laborType'] ?? 'profile';
     if (type == 'flat') {
-      return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.12),
-              )),
-          child: Text('Flat Fee',
-              style: TextStyle(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13)));
+      return GestureDetector(
+        onTap: () => _showEditHourlyRateDialog(0),
+        child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+                color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: colorScheme.primary.withValues(alpha: 0.12),
+                )),
+            child: Text('Flat Fee',
+                style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13))),
+      );
     }
     final rate = type == 'hourly'
         ? (double.tryParse(_editableData['laborRate']?.toString() ?? '85') ??
             85.0)
         : (_profile?.hourlyRate ?? 85.0);
+    final hours = double.tryParse(_laborHoursCtrl.text) ?? 0.0;
+    final isNoLabor = rate == 0 && hours == 0;
     return GestureDetector(
       onTap: () => _showEditHourlyRateDialog(rate),
       child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.25),
+              color: isNoLabor
+                  ? colorScheme.surfaceContainerHighest.withValues(alpha: 0.5)
+                  : colorScheme.primaryContainer.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: colorScheme.primary.withValues(alpha: 0.12),
+                color: isNoLabor
+                    ? colorScheme.outlineVariant
+                    : colorScheme.primary.withValues(alpha: 0.12),
               )),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('× ${f.format(rate)}',
+              Text(
+                  isNoLabor ? 'No labor' : '× ${f.format(rate)}',
                   style: TextStyle(
-                      color: colorScheme.primary,
+                      color: isNoLabor
+                          ? colorScheme.onSurfaceVariant
+                          : colorScheme.primary,
                       fontWeight: FontWeight.w700,
                       fontSize: 13)),
               const SizedBox(width: 3),
               Icon(Icons.edit,
-                  size: 12, color: colorScheme.primary.withValues(alpha: 0.45)),
+                  size: 12,
+                  color: isNoLabor
+                      ? colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+                      : colorScheme.primary.withValues(alpha: 0.45)),
             ],
           )),
     );
@@ -2307,38 +2433,98 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   void _showEditHourlyRateDialog(double currentRate) {
     final rateCtrl =
         TextEditingController(text: currentRate.toStringAsFixed(2));
-    showDialog(
+    final colorScheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Hourly Rate'),
-        content: TextField(
-          controller: rateCtrl,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Hourly Rate',
-            prefixText: '\$ ',
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text('Labor Rate',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurface,
+                    )),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: TextField(
+                    controller: rateCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Hourly Rate',
+                      prefixText: '\$ ',
+                      hintText: '0 for no labor charge',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _editableData['laborType'] = 'hourly';
+                              _editableData['laborRate'] = 0.0;
+                              _laborHoursCtrl.text = '0';
+                            });
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('No Labor'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            final newRate = double.tryParse(rateCtrl.text);
+                            if (newRate != null && newRate >= 0) {
+                              setState(() {
+                                _editableData['laborType'] = 'hourly';
+                                _editableData['laborRate'] = newRate;
+                              });
+                            }
+                            Navigator.pop(ctx);
+                          },
+                          child: const Text('Apply'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final newRate = double.tryParse(rateCtrl.text);
-              if (newRate != null && newRate > 0) {
-                setState(() {
-                  _editableData['laborType'] = 'hourly';
-                  _editableData['laborRate'] = newRate;
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Apply'),
-          ),
-        ],
       ),
     );
   }
@@ -2362,11 +2548,13 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
             children: [
               Text('MATERIALS & PARTS',
                   style: AppTextStyles.metadata(Theme.of(context).textTheme, cs)
-                      .copyWith(fontWeight: FontWeight.w700, letterSpacing: 1.05)),
+                      .copyWith(
+                          fontWeight: FontWeight.w700, letterSpacing: 1.05)),
               const Spacer(),
               if (materials.isNotEmpty) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
@@ -2382,7 +2570,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                 ),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: cs.primaryContainer.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
@@ -2449,13 +2638,13 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               final isFromReceipt = item['fromReceipt'] == true;
               final originalCost = item['originalCost'] as num?;
               final currentCost = (item['cost'] as num?)?.toDouble() ?? 0.0;
-              final hasMarkup =
-                  originalCost != null && _markupPercent > 0;
+              final hasMarkup = originalCost != null && _markupPercent > 0;
               final qty = (item['quantity'] as num?)?.toInt() ?? 1;
               final unitPrice = (item['unitPrice'] as num?)?.toDouble();
 
               return Container(
-                margin: EdgeInsets.only(bottom: index < materials.length - 1 ? 6 : 0),
+                margin: EdgeInsets.only(
+                    bottom: index < materials.length - 1 ? 6 : 0),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
@@ -2476,7 +2665,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                           color: cs.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Icon(Icons.receipt_outlined, size: 14, color: cs.primary),
+                        child: Icon(Icons.receipt_outlined,
+                            size: 14, color: cs.primary),
                       ),
                       const SizedBox(width: 10),
                     ],
@@ -2495,7 +2685,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                               '$qty × ${f.format(unitPrice)}',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                                color:
+                                    cs.onSurfaceVariant.withValues(alpha: 0.7),
                               ),
                             )
                           else if (hasMarkup)
@@ -2512,7 +2703,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                               qty > 1 ? 'Qty: $qty' : 'Qty: 1',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                                color:
+                                    cs.onSurfaceVariant.withValues(alpha: 0.5),
                               ),
                             ),
                         ],
@@ -2581,15 +2773,17 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                           color: cs.tertiary),
                       decoration: InputDecoration(
                         isDense: true,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 6),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: cs.tertiary.withValues(alpha: 0.3)),
+                          borderSide: BorderSide(
+                              color: cs.tertiary.withValues(alpha: 0.3)),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: cs.tertiary.withValues(alpha: 0.3)),
+                          borderSide: BorderSide(
+                              color: cs.tertiary.withValues(alpha: 0.3)),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -2612,7 +2806,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   const Spacer(),
                   if (_markupPercent > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                         color: cs.tertiary.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(10),
@@ -2895,6 +3090,10 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       final container = ProviderScope.containerOf(context);
       final notifier = container.read(voiceCaptureProvider.notifier);
       final invoiceContext = _buildInvoiceContext();
+      final knownCustomers = _customers
+          .map((customer) => customer['name']?.toString().trim() ?? '')
+          .where((name) => name.isNotEmpty)
+          .toList();
 
       // Show full-screen voice recording overlay, passing current state
       final result = await Navigator.of(context).push<VoiceCaptureResult>(
@@ -2904,6 +3103,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               _VoiceRefineSheet(
             notifier: notifier,
             invoiceContext: invoiceContext,
+            knownCustomers: knownCustomers,
           ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(opacity: animation, child: child);
@@ -2921,100 +3121,123 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       // We apply it wholesale, preserving internal metadata (UUIDs, receipt links).
       setState(() {
         // ── Simple fields — direct replacement ──
-        final newClient = (newData['clientName'] ?? '').toString().trim();
-        if (newClient.isNotEmpty && newClient != 'Unknown') {
-          _clientCtrl.text = newClient;
+        if (newData.containsKey('clientName')) {
+          _clientCtrl.text = (newData['clientName'] ?? '').toString().trim();
         }
 
-        final newAddress = (newData['clientAddress'] ?? '').toString().trim();
-        if (newAddress.isNotEmpty) _clientAddressCtrl.text = newAddress;
+        if (newData.containsKey('clientAddress')) {
+          _clientAddressCtrl.text =
+              (newData['clientAddress'] ?? '').toString().trim();
+        }
 
-        final newPhone = (newData['clientPhone'] ?? '').toString().trim();
-        if (newPhone.isNotEmpty) _clientPhoneCtrl.text = newPhone;
+        if (newData.containsKey('clientPhone')) {
+          _clientPhoneCtrl.text =
+              (newData['clientPhone'] ?? '').toString().trim();
+        }
 
-        final newEmail = (newData['clientEmail'] ?? '').toString().trim();
-        if (newEmail.isNotEmpty) _clientEmailCtrl.text = newEmail;
+        if (newData.containsKey('clientEmail')) {
+          _clientEmailCtrl.text =
+              (newData['clientEmail'] ?? '').toString().trim();
+        }
 
         final newType = newData['type']?.toString();
         if (newType == 'invoice' || newType == 'quote') {
           _editableData['type'] = newType;
         }
 
-        final newDesc = (newData['description'] ?? '').toString().trim();
-        if (newDesc.isNotEmpty) _descCtrl.text = newDesc;
+        if (newData.containsKey('description')) {
+          _descCtrl.text = (newData['description'] ?? '').toString().trim();
+        }
 
         // ── Labor ──
-        final newHours = newData['laborHours'];
-        if (newHours != null) {
-          _laborHoursCtrl.text = (newHours as num).toDouble().toString();
+        if (newData.containsKey('laborHours')) {
+          final newHours = _toDouble(newData['laborHours']) ?? 0.0;
+          _laborHoursCtrl.text = newHours.toString();
         }
 
         final newLaborType = newData['laborType']?.toString();
-        if (newLaborType != null) {
+        if (newLaborType == 'profile' ||
+            newLaborType == 'hourly' ||
+            newLaborType == 'flat') {
           _editableData['laborType'] = newLaborType;
         }
-        if (newData['laborRate'] != null) {
-          _editableData['laborRate'] = (newData['laborRate'] as num).toDouble();
+        if (newData.containsKey('laborRate')) {
+          _editableData['laborRate'] = _toDouble(newData['laborRate']);
         }
-        if (newData['laborAmount'] != null) {
-          _editableData['laborAmount'] =
-              (newData['laborAmount'] as num).toDouble();
+        if (newData.containsKey('laborAmount')) {
+          _editableData['laborAmount'] = _toDouble(newData['laborAmount']);
         }
 
         // ── Markup ──
-        if (newData['markupPercent'] != null) {
-          _markupPercent = (newData['markupPercent'] as num).toDouble();
+        if (newData.containsKey('markupPercent')) {
+          _markupPercent = _toDouble(newData['markupPercent']) ?? 0.0;
           _markupCtrl.text = _markupPercent.toStringAsFixed(
               _markupPercent == _markupPercent.roundToDouble() ? 0 : 1);
         }
 
         // ── Materials — smart merge to preserve UUIDs and receipt metadata ──
-        final newMaterials = (newData['materials'] as List?) ?? [];
-        final oldMaterials =
-            List<Map<String, dynamic>>.from(_editableData['materials'] as List);
+        if (newData.containsKey('materials')) {
+          final newMaterials = (newData['materials'] as List?) ?? [];
+          final oldMaterials = List<Map<String, dynamic>>.from(
+              _editableData['materials'] as List);
 
-        // Build a lookup of old materials by name (case-insensitive) for metadata
-        final oldByName = <String, Map<String, dynamic>>{};
-        for (final m in oldMaterials) {
-          final name = (m['item']?.toString() ?? '').toLowerCase().trim();
-          if (name.isNotEmpty) oldByName[name] = m;
-        }
-
-        final mergedMaterials = <Map<String, dynamic>>[];
-        for (final nm in newMaterials) {
-          if (nm is! Map) continue;
-          final mat = Map<String, dynamic>.from(nm);
-          final name = (mat['item']?.toString() ?? '').toLowerCase().trim();
-
-          // Try to match with existing material to preserve UUID & receipt data
-          final existing = oldByName[name];
-          if (existing != null) {
-            // Preserve internal metadata from the old material
-            mat['id'] = existing['id'];
-            if (existing['fromReceipt'] == true) {
-              mat['fromReceipt'] = true;
-              mat['originalCost'] = existing['originalCost'];
-              mat['receiptId'] = existing['receiptId'];
+          final oldByName = <String, List<Map<String, dynamic>>>{};
+          for (final material in oldMaterials) {
+            final name = _normalizeMaterialName(material['item']);
+            if (name.isEmpty) {
+              continue;
             }
-            // Remove from lookup so second match gets a new UUID
-            oldByName.remove(name);
-          } else {
-            // New material — assign a UUID
-            mat['id'] ??= const Uuid().v4();
+            oldByName.putIfAbsent(name, () => <Map<String, dynamic>>[]).add(
+                  material,
+                );
           }
 
-          // Ensure quantity, unitPrice, cost are valid
-          final qty = (mat['quantity'] as num?)?.toInt() ?? 1;
-          final unitPrice = (mat['unitPrice'] as num?)?.toDouble() ?? 0.0;
-          mat['quantity'] = qty < 1 ? 1 : qty;
-          mat['unitPrice'] = unitPrice;
-          mat['cost'] = qty * unitPrice;
+          final mergedMaterials = <Map<String, dynamic>>[];
+          for (final nm in newMaterials) {
+            if (nm is! Map) {
+              continue;
+            }
 
-          mergedMaterials.add(mat);
+            final mat = Map<String, dynamic>.from(nm);
+            final name = _normalizeMaterialName(mat['item']);
+
+            Map<String, dynamic>? existing;
+            final matches = oldByName[name];
+            if (matches != null && matches.isNotEmpty) {
+              existing = matches.removeAt(0);
+              if (matches.isEmpty) {
+                oldByName.remove(name);
+              }
+            }
+
+            if (existing != null) {
+              mat['id'] = existing['id'];
+              if (existing['fromReceipt'] == true) {
+                mat['fromReceipt'] = true;
+                mat['originalCost'] = existing['originalCost'];
+                mat['receiptId'] = existing['receiptId'];
+              }
+            } else {
+              mat['id'] ??= const Uuid().v4();
+            }
+
+            final qty = _toInt(mat['quantity']) ?? 1;
+            final safeQty = qty < 1 ? 1 : qty;
+            final unitPrice = _toDouble(mat['unitPrice']) ?? 0.0;
+            mat['quantity'] = safeQty;
+            mat['unitPrice'] = unitPrice;
+            mat['cost'] = safeQty * unitPrice;
+
+            mergedMaterials.add(mat);
+          }
+
+          _editableData['materials'] = mergedMaterials;
         }
 
-        _editableData['materials'] = mergedMaterials;
+        _isDirty = true;
       });
+
+      _syncCustomerLinkFromClientName();
 
       // Show the AI's confirmation message
       final aiMessage = (newData['message'] ?? '').toString().trim();
@@ -3047,7 +3270,12 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 class _VoiceRefineSheet extends StatefulWidget {
   final VoiceCaptureNotifier notifier;
   final Map<String, dynamic>? invoiceContext;
-  const _VoiceRefineSheet({required this.notifier, this.invoiceContext});
+  final List<String> knownCustomers;
+  const _VoiceRefineSheet({
+    required this.notifier,
+    this.invoiceContext,
+    this.knownCustomers = const [],
+  });
 
   @override
   State<_VoiceRefineSheet> createState() => _VoiceRefineSheetState();
@@ -3079,7 +3307,8 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _statusText = 'Could not start recording. Tap mic to retry.');
+        setState(
+            () => _statusText = 'Could not start recording. Tap mic to retry.');
       }
     }
   }
@@ -3121,10 +3350,9 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
                 width: _isRecording ? 140 : 100,
                 height: _isRecording ? 140 : 100,
                 decoration: BoxDecoration(
-                  color: (_isRecording
-                          ? colorScheme.error
-                          : colorScheme.primary)
-                      .withValues(alpha: 0.08),
+                  color:
+                      (_isRecording ? colorScheme.error : colorScheme.primary)
+                          .withValues(alpha: 0.08),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -3214,7 +3442,10 @@ class _VoiceRefineSheetState extends State<_VoiceRefineSheet> {
       });
       try {
         final result = await widget.notifier
-            .stopAndProcess(invoiceContext: widget.invoiceContext)
+            .stopAndProcess(
+              invoiceContext: widget.invoiceContext,
+              knownCustomers: widget.knownCustomers,
+            )
             .timeout(const Duration(seconds: 45));
         if (result == null) {
           // Pipeline failed (error was swallowed by notifier)
