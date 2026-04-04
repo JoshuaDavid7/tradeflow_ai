@@ -1393,6 +1393,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                 'cost': double.parse(markedUpCost.toStringAsFixed(2)),
                 'originalCost': cost,
                 'fromReceipt': true,
+                'markupEnabled': true,
               });
             }
             _isDirty = true;
@@ -1423,6 +1424,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           'cost': double.parse(markedUpCost.toStringAsFixed(2)),
           'originalCost': cost,
           'fromReceipt': true,
+          'markupEnabled': true,
         });
         _isDirty = true;
       });
@@ -1439,12 +1441,16 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       }
       if (m['originalCost'] != null) {
         final original = (m['originalCost'] as num).toDouble();
-        final markedUp = _markupPercent > 0
+        final enabled = m['markupEnabled'] != false; // default true
+        final markedUp = (_markupPercent > 0 && enabled)
             ? original * (1 + _markupPercent / 100)
             : original;
+        final qty = (m['quantity'] as num?)?.toInt() ?? 1;
         materials[i] = {
           ...Map<String, dynamic>.from(m),
           'cost': double.parse(markedUp.toStringAsFixed(2)),
+          'unitPrice': double.parse(
+              (markedUp / (qty > 0 ? qty : 1)).toStringAsFixed(2)),
         };
       }
     }
@@ -2058,6 +2064,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
             'originalCost': cost,
             'fromReceipt': expense.hasReceipt,
             'expenseId': expense.id,
+            'markupEnabled': true,
           });
         }
 
@@ -2082,6 +2089,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               'originalCost': cost,
               'fromReceipt': true,
               'expenseId': expense.id,
+              'markupEnabled': true,
             });
           }
         }
@@ -2918,9 +2926,24 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               final isFromReceipt = item['fromReceipt'] == true;
               final originalCost = item['originalCost'] as num?;
               final currentCost = (item['cost'] as num?)?.toDouble() ?? 0.0;
-              final hasMarkup = originalCost != null && _markupPercent > 0;
+              final markupOn = item['markupEnabled'] != false;
+              final hasMarkup =
+                  originalCost != null && _markupPercent > 0 && markupOn;
               final qty = (item['quantity'] as num?)?.toInt() ?? 1;
               final unitPrice = (item['unitPrice'] as num?)?.toDouble();
+
+              // Build subtitle text
+              String subtitle;
+              if (qty > 1 && unitPrice != null) {
+                subtitle = '$qty × ${f.format(unitPrice)}';
+              } else if (hasMarkup) {
+                subtitle =
+                    '\$${originalCost.toStringAsFixed(2)} + ${_markupPercent.toStringAsFixed(0)}% markup';
+              } else if (_markupPercent > 0 && !markupOn && originalCost != null) {
+                subtitle = 'No markup';
+              } else {
+                subtitle = qty > 1 ? 'Qty: $qty' : 'Qty: 1';
+              }
 
               return Container(
                 margin: EdgeInsets.only(
@@ -2960,37 +2983,62 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
-                          if (qty > 1 && unitPrice != null)
-                            Text(
-                              '$qty × ${f.format(unitPrice)}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color:
-                                    cs.onSurfaceVariant.withValues(alpha: 0.7),
-                              ),
-                            )
-                          else if (hasMarkup)
-                            Text(
-                              '\$${originalCost.toStringAsFixed(2)} + ${_markupPercent.toStringAsFixed(0)}% markup',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: cs.tertiary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            )
-                          else
-                            Text(
-                              qty > 1 ? 'Qty: $qty' : 'Qty: 1',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color:
-                                    cs.onSurfaceVariant.withValues(alpha: 0.5),
-                              ),
+                          Text(
+                            subtitle,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: hasMarkup ? FontWeight.w500 : null,
+                              color: hasMarkup
+                                  ? cs.tertiary
+                                  : cs.onSurfaceVariant.withValues(alpha: 0.6),
                             ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    // Per-item markup toggle (only when global markup > 0)
+                    if (_markupPercent > 0) ...[
+                      const SizedBox(width: 4),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: () {
+                            setState(() {
+                              item['markupEnabled'] = !markupOn;
+                              _applyMarkupToReceiptItems();
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: markupOn
+                                  ? cs.tertiary.withValues(alpha: 0.12)
+                                  : cs.outlineVariant.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: markupOn
+                                    ? cs.tertiary.withValues(alpha: 0.3)
+                                    : cs.outlineVariant.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Text(
+                              markupOn ? '%' : '—',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: markupOn
+                                    ? cs.tertiary
+                                    : cs.onSurfaceVariant
+                                        .withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 6),
                     Text(f.format(currentCost),
                         style: TextStyle(
                             fontWeight: FontWeight.w700,
