@@ -1300,7 +1300,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                           ),
                           const SizedBox(width: 8),
                           SizedBox(
-                            width: 70,
+                            width: 90,
                             child: Text(
                               '$cs${child.amount.toStringAsFixed(2)}',
                               textAlign: TextAlign.right,
@@ -1330,9 +1330,9 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800))),
-                        const SizedBox(width: 68),
+                        const SizedBox(width: 48),
                         SizedBox(
-                          width: 70,
+                          width: 90,
                           child: Text(
                             '$cs${row.totalAmount.toStringAsFixed(2)}',
                             textAlign: TextAlign.right,

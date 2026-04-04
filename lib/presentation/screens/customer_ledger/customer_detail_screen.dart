@@ -2027,27 +2027,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             Positioned(
               bottom: 20,
               right: 20,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: FloatingActionButton(
-                      heroTag: 'customer_notes_fab',
-                      elevation: 2,
-                      onPressed: _openNoteEditor,
-                      child: const Icon(Icons.note_add),
-                    ),
-                  ),
-                  FloatingActionButton(
-                    heroTag: 'customer_notes_ai_fab',
-                    elevation: 2,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    shape: const CircleBorder(),
-                    onPressed: () => _openAiAssistant(context),
-                    child: const Icon(Icons.mic_rounded, color: Colors.white, size: 24),
-                  ),
-                ],
+              child: FloatingActionButton(
+                heroTag: 'customer_notes_fab',
+                elevation: 2,
+                onPressed: _openNoteEditor,
+                child: const Icon(Icons.note_add),
               ),
             ),
           ],
