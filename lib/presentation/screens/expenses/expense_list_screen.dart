@@ -104,11 +104,7 @@ class _ExpenseListScreenState extends ConsumerState<ExpenseListScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'expense_list_fab',
-        onPressed: () => _navigateToAddExpense(context),
-        child: const Icon(Icons.add),
-      ),
+      // FAB managed by MainShellScreen for stacked layout.
     );
   }
 

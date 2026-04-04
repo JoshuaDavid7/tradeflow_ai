@@ -8,6 +8,7 @@ import '../../providers/profile_provider.dart';
 import '../../widgets/shimmer_loading.dart';
 import '../../../data/services/supabase_service.dart';
 import 'customer_detail_screen.dart';
+import '../main_shell_screen.dart' show addCustomerTriggerProvider;
 
 class CustomerLedgerScreen extends ConsumerStatefulWidget {
   const CustomerLedgerScreen({super.key});
@@ -22,6 +23,11 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for shell FAB trigger to open the add-customer dialog.
+    ref.listen<int>(addCustomerTriggerProvider, (prev, next) {
+      if (prev != next) _showAddCustomerDialog(context);
+    });
+
     final customersAsync = ref.watch(customerLedgerListProvider);
     final currencySymbol = ref.watch(currencySymbolProvider);
 
@@ -156,11 +162,7 @@ class _CustomerLedgerScreenState extends ConsumerState<CustomerLedgerScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'customer_ledger_fab',
-        onPressed: () => _showAddCustomerDialog(context),
-        child: const Icon(Icons.person_add),
-      ),
+      // FAB managed by MainShellScreen for stacked layout.
     );
   }
 

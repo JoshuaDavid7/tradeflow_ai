@@ -10,6 +10,10 @@ import 'analytics/analytics_dashboard.dart';
 import 'customer_ledger/customer_ledger_screen.dart';
 import 'dashboard_screen_new.dart';
 import 'expenses/expense_list_screen.dart';
+import 'expenses/add_expense_screen.dart';
+
+/// Incremented to trigger the add-customer dialog from the shell FAB.
+final addCustomerTriggerProvider = StateProvider<int>((ref) => 0);
 
 /// The persistent shell that holds the bottom navigation bar and an
 /// [IndexedStack] of top-level tab bodies.
@@ -38,6 +42,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  void _triggerAddCustomer() {
+    ref.read(addCustomerTriggerProvider.notifier).state++;
   }
 
   Future<void> _openAssistant(BuildContext context, WidgetRef ref) async {
@@ -70,16 +78,48 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             }),
           ),
 
-          // ── AI mic button — bottom LEFT ──
-          // Positioned on the left so it never conflicts with
-          // screen-specific FABs (add expense, add client) on the right.
+          // ── Right-side FAB stack: action on top, mic below ──
+          // Mic sits at the very bottom for easy thumb access.
           // Hidden on Home which has its own "Start with voice" card.
           if (selectedIndex != 0)
             Positioned(
-              left: 20,
+              right: 20,
               bottom: 20,
-              child: _AiAssistantFab(
-                onTap: () => _openAssistant(context, ref),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Screen-specific action (add expense, add client)
+                  if (selectedIndex == 2) // Expenses
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: FloatingActionButton(
+                        heroTag: 'shell_expense_fab',
+                        elevation: 2,
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AddExpenseScreen(),
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.add),
+                      ),
+                    ),
+                  if (selectedIndex == 3) // Clients
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: FloatingActionButton(
+                        heroTag: 'shell_client_fab',
+                        elevation: 2,
+                        onPressed: () => _triggerAddCustomer(),
+                        child: const Icon(Icons.person_add),
+                      ),
+                    ),
+                  // AI mic — always at the bottom for thumb reach
+                  _AiAssistantFab(
+                    onTap: () => _openAssistant(context, ref),
+                  ),
+                ],
               ),
             ),
         ],
