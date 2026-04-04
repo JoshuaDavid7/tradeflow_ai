@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:uuid/uuid.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/job_repository.dart';
+import '../../services/payment_receipt_service.dart';
 import '../providers/profile_provider.dart';
 
 /// Payment method options for the dropdown.
@@ -30,6 +33,8 @@ Future<bool?> showRecordPaymentSheet(
   required double totalAmount,
   required double amountPaid,
   required String clientName,
+  String? clientEmail,
+  String? invoiceNumber,
   double? initialAmount,
   String? initialMethod,
 }) {
@@ -46,6 +51,8 @@ Future<bool?> showRecordPaymentSheet(
         totalAmount: totalAmount,
         amountPaid: amountPaid,
         clientName: clientName,
+        clientEmail: clientEmail,
+        invoiceNumber: invoiceNumber,
         initialAmount: initialAmount,
         initialMethod: initialMethod,
       ),
@@ -62,6 +69,8 @@ class RecordPaymentSheet extends ConsumerStatefulWidget {
   final double totalAmount;
   final double amountPaid;
   final String clientName;
+  final String? clientEmail;
+  final String? invoiceNumber;
   final double? initialAmount;
   final String? initialMethod;
 
@@ -71,6 +80,8 @@ class RecordPaymentSheet extends ConsumerStatefulWidget {
     required this.totalAmount,
     required this.amountPaid,
     required this.clientName,
+    this.clientEmail,
+    this.invoiceNumber,
     this.initialAmount,
     this.initialMethod,
   });
@@ -166,19 +177,55 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
     try {
       final repository = ref.read(jobRepositoryProvider);
       final amount = double.parse(_amountController.text.trim());
+      final balanceBefore = _remainingBalance;
+      final balanceAfter = balanceBefore - amount;
+      final reference = _referenceController.text.trim().isEmpty
+          ? null
+          : _referenceController.text.trim();
 
       await repository.recordPayment(
         widget.jobId,
         amount,
         _selectedMethod,
         receivedAt: _selectedDate,
-        reference: _referenceController.text.trim().isEmpty
-            ? null
-            : _referenceController.text.trim(),
+        reference: reference,
         notes: _notesController.text.trim().isEmpty
             ? null
             : _notesController.text.trim(),
       );
+
+      // Generate payment receipt
+      final profileState = ref.read(profileProvider);
+      final profile = profileState.profile;
+      if (profile != null) {
+        try {
+          final receipt = await PaymentReceiptService.createReceipt(
+            paymentId: const Uuid().v4(),
+            jobId: widget.jobId,
+            userId: profile.id,
+            profile: profile,
+            customerName: widget.clientName,
+            customerEmail: widget.clientEmail,
+            invoiceNumber: widget.invoiceNumber ?? '',
+            invoiceTotal: widget.totalAmount,
+            paymentAmount: amount,
+            paymentMethod: _selectedMethod,
+            transactionReference: reference,
+            paymentDate: _selectedDate,
+            balanceBefore: balanceBefore,
+            balanceAfter: balanceAfter < 0 ? 0 : balanceAfter,
+          );
+
+          if (mounted) {
+            Navigator.pop(context, true);
+            // Offer to share/view the receipt
+            _showReceiptAction(receipt, profile.currencySymbol);
+          }
+          return;
+        } catch (e) {
+          debugPrint('Receipt generation failed: $e');
+        }
+      }
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -197,6 +244,37 @@ class _RecordPaymentSheetState extends ConsumerState<RecordPaymentSheet> {
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  void _showReceiptAction(
+      dynamic receipt, String currencySymbol) {
+    // Use the parent context since we already popped this sheet.
+    final parentContext = context;
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(parentContext).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Payment recorded. ${receipt.isFullyPaid ? 'Invoice paid in full!' : 'Partial payment received.'}',
+        ),
+        action: SnackBarAction(
+          label: 'View Receipt',
+          onPressed: () async {
+            try {
+              final pdfBytes = await PaymentReceiptService.generatePdf(
+                receipt,
+                currencySymbol: currencySymbol,
+              );
+              await PaymentReceiptService.sharePdf(
+                  pdfBytes, receipt.receiptNumber);
+            } catch (e) {
+              debugPrint('Receipt share failed: $e');
+            }
+          },
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
   }
 
   // ── Build ───────────────────────────────────────────────────────────────

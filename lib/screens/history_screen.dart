@@ -159,12 +159,17 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen>
                 ? job['title'].toString().trim()
                 : 'Untitled Job';
 
+    final invoiceNumber = job['invoice_number']?.toString() ?? '';
+    final clientEmail = job['client_email']?.toString();
+
     final recorded = await showRecordPaymentSheet(
       context,
       jobId: jobId,
       totalAmount: total,
       amountPaid: amountPaid,
       clientName: clientName,
+      clientEmail: clientEmail,
+      invoiceNumber: invoiceNumber,
     );
 
     if (recorded == true) {
