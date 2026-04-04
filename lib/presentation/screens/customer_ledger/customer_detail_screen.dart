@@ -75,96 +75,9 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         ),
         actions: [
           // Create invoice for this customer
-          PopupMenuButton<String>(
+          IconButton(
             icon: const Icon(Icons.add),
-            onSelected: (value) {
-              if (value == 'edit_client') {
-                _showEditClientDialog();
-              } else if (value == 'invoice') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DraftReviewScreen(
-                      jobData: {
-                        'type': 'invoice',
-                        'materials': [],
-                        'clientName': _customerName,
-                        'client_name': _customerName,
-                        'customer_id': _customerId,
-                        'clientPhone': _customerData['phone'] ?? '',
-                        'clientEmail': _customerData['email'] ?? '',
-                        'clientAddress': _customerData['address'] ?? '',
-                      },
-                    ),
-                  ),
-                ).then((_) => _invalidateProviders());
-              } else if (value == 'quote') {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => DraftReviewScreen(
-                      jobData: {
-                        'type': 'quote',
-                        'materials': [],
-                        'clientName': _customerName,
-                        'client_name': _customerName,
-                        'customer_id': _customerId,
-                        'clientPhone': _customerData['phone'] ?? '',
-                        'clientEmail': _customerData['email'] ?? '',
-                        'clientAddress': _customerData['address'] ?? '',
-                      },
-                    ),
-                  ),
-                ).then((_) => _invalidateProviders());
-              } else if (value == 'project') {
-                _showAddProjectDialog();
-              } else if (value == 'note') {
-                _openNoteEditor();
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'edit_client',
-                child: ListTile(
-                  leading: Icon(Icons.edit),
-                  title: Text('Edit Client'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'invoice',
-                child: ListTile(
-                  leading: Icon(Icons.receipt_long),
-                  title: Text('New Invoice'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'quote',
-                child: ListTile(
-                  leading: Icon(Icons.request_quote),
-                  title: Text('New Quote'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'project',
-                child: ListTile(
-                  leading: Icon(Icons.create_new_folder),
-                  title: Text('New Project'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'note',
-                child: ListTile(
-                  leading: Icon(Icons.note_add),
-                  title: Text('New Note'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ],
+            onPressed: () => _showActionsSheet(context),
           ),
         ],
         bottom: TabBar(
@@ -2027,13 +1940,11 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
             Positioned(
               bottom: 40,
               right: 20,
-              child: FloatingActionButton.extended(
+              child: FloatingActionButton(
                 heroTag: 'customer_notes_fab',
-                elevation: 3,
+                elevation: 2,
                 onPressed: _openNoteEditor,
-                icon: const Icon(Icons.note_add, size: 20),
-                label: const Text('New Note',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                child: const Icon(Icons.note_add),
               ),
             ),
           ],
@@ -2235,6 +2146,113 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen>
         return AppColors.noteBlue;
     }
   }
+
+  void _showActionsSheet(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Actions',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  )),
+              const SizedBox(height: 8),
+              _actionTile(ctx, Icons.edit_rounded, 'Edit Client', colorScheme.onSurface, () {
+                Navigator.pop(ctx);
+                _showEditClientDialog();
+              }),
+              Divider(height: 1, indent: 56, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+              _actionTile(ctx, Icons.receipt_long_rounded, 'New Invoice', colorScheme.primary, () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => DraftReviewScreen(jobData: _buildJobData('invoice')),
+                )).then((_) => _invalidateProviders());
+              }),
+              _actionTile(ctx, Icons.request_quote_rounded, 'New Quote', colorScheme.primary, () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => DraftReviewScreen(jobData: _buildJobData('quote')),
+                )).then((_) => _invalidateProviders());
+              }),
+              _actionTile(ctx, Icons.post_add_rounded, 'New Expense', Colors.red.shade400, () {
+                Navigator.pop(ctx);
+                Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => AddExpenseScreen(
+                    initialData: {'vendor': _customerName},
+                  ),
+                ));
+              }),
+              Divider(height: 1, indent: 56, color: colorScheme.outlineVariant.withValues(alpha: 0.3)),
+              _actionTile(ctx, Icons.create_new_folder_rounded, 'New Project', colorScheme.onSurfaceVariant, () {
+                Navigator.pop(ctx);
+                _showAddProjectDialog();
+              }),
+              _actionTile(ctx, Icons.note_add_rounded, 'New Note', colorScheme.onSurfaceVariant, () {
+                Navigator.pop(ctx);
+                _openNoteEditor();
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _actionTile(BuildContext ctx, IconData icon, String label, Color iconColor, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: iconColor),
+            const SizedBox(width: 16),
+            Text(label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: Theme.of(ctx).colorScheme.onSurface,
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic> _buildJobData(String type) => {
+    'type': type,
+    'materials': <Map<String, dynamic>>[],
+    'clientName': _customerName,
+    'client_name': _customerName,
+    'customer_id': _customerId,
+    'clientPhone': _customerData['phone'] ?? '',
+    'clientEmail': _customerData['email'] ?? '',
+    'clientAddress': _customerData['address'] ?? '',
+  };
 
   Future<void> _openAiAssistant(BuildContext context) async {
     final notifier = ref.read(aiAssistantProvider.notifier);

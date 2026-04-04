@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/services/supabase_service.dart';
 import '../../../screens/draft_review_screen.dart';
 import 'note_editor_screen.dart';
+import 'block_editor/note_block.dart';
 
 class ProjectDetailScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> project;
@@ -348,7 +349,7 @@ class _ProjectDetailScreenState extends ConsumerState<ProjectDetailScreen> {
                       ),
                       if (content.isNotEmpty) ...[
                         const SizedBox(height: 5),
-                        Text(content,
+                        Text(plainTextPreview(content, maxLength: 100),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
