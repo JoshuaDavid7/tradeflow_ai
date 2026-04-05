@@ -5,9 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:intl/intl.dart';
+
 import '../models/business_profile.dart' as legacy;
 import '../services/pdf_service.dart';
 import '../services/template_service.dart';
+import '../services/payment_receipt_service.dart';
+import '../domain/models/payment_receipt.dart';
 import '../data/services/supabase_service.dart';
 import '../presentation/providers/profile_provider.dart';
 import '../presentation/providers/job_provider.dart';
@@ -31,6 +35,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
   bool _isLoading = true;
   Uint8List? _pdfBytes;
   String? _error;
+  List<PaymentReceipt> _receipts = [];
 
   /// Mutable snapshot of jobData — refreshed after payment recording.
   late Map<String, dynamic> _jobData;
@@ -40,6 +45,14 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
     super.initState();
     _jobData = Map<String, dynamic>.from(widget.jobData);
     _generatePdf();
+    _loadReceipts();
+  }
+
+  Future<void> _loadReceipts() async {
+    final jobId = _jobData['id']?.toString() ?? '';
+    if (jobId.isEmpty) return;
+    final receipts = await PaymentReceiptService.getReceiptsForJob(jobId);
+    if (mounted) setState(() => _receipts = receipts);
   }
 
   Future<void> _generatePdf() async {
@@ -152,6 +165,7 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
             ..clear()
             ..addAll(Map<String, dynamic>.from(updatedJob));
           await _generatePdf();
+          await _loadReceipts();
           setState(() {});
         }
       } catch (e) {
@@ -488,6 +502,10 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                         ),
                       ),
 
+                    // Payment history (receipts)
+                    if (_receipts.isNotEmpty)
+                      _buildPaymentHistory(colorScheme, isDark),
+
                     // Action bar — context-aware buttons
                     Container(
                       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -568,6 +586,192 @@ class _PdfPreviewScreenState extends ConsumerState<PdfPreviewScreen> {
                   ],
                 ),
     );
+  }
+
+  Widget _buildPaymentHistory(ColorScheme cs, bool isDark) {
+    final currencySymbol = ref.watch(currencySymbolProvider);
+    final f = NumberFormat.currency(symbol: currencySymbol);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long, size: 18, color: cs.primary),
+              const SizedBox(width: 8),
+              Text('Payment History',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurface,
+                  )),
+              const Spacer(),
+              Text('${_receipts.length} receipt${_receipts.length != 1 ? 's' : ''}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurfaceVariant,
+                  )),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...List.generate(_receipts.length, (i) {
+            final receipt = _receipts[i];
+            final isLast = i == _receipts.length - 1;
+            return Column(
+              children: [
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _viewReceipt(receipt),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(
+                            color: receipt.isFullyPaid
+                                ? Colors.green.withValues(alpha: 0.1)
+                                : Colors.amber.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            receipt.isFullyPaid
+                                ? Icons.check_circle_outline
+                                : Icons.schedule,
+                            size: 18,
+                            color: receipt.isFullyPaid
+                                ? Colors.green
+                                : Colors.amber.shade700,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                f.format(receipt.paymentAmount),
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: cs.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${receipt.methodDisplayName} \u2022 ${DateFormat('MMM d, yyyy').format(receipt.paymentDate)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              receipt.receiptNumber,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              receipt.isFullyPaid ? 'Paid in full' : 'Partial',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: receipt.isFullyPaid
+                                    ? Colors.green
+                                    : Colors.amber.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.chevron_right, size: 18, color: cs.outlineVariant),
+                      ],
+                    ),
+                  ),
+                ),
+                if (!isLast)
+                  Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.2)),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _viewReceipt(PaymentReceipt receipt) async {
+    final currencySymbol = ref.read(currencySymbolProvider);
+    try {
+      final pdfBytes = await PaymentReceiptService.generatePdf(
+        receipt,
+        currencySymbol: currencySymbol,
+      );
+
+      if (!mounted) return;
+
+      // Show receipt in a full-screen dialog with share/print options
+      await showDialog(
+        context: context,
+        builder: (ctx) => Scaffold(
+          appBar: AppBar(
+            title: Text('Receipt ${receipt.receiptNumber}'),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.share),
+                tooltip: 'Share',
+                onPressed: () async {
+                  await PaymentReceiptService.sharePdf(
+                      pdfBytes, receipt.receiptNumber);
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.print),
+                tooltip: 'Print',
+                onPressed: () async {
+                  await Printing.layoutPdf(
+                      onLayout: (_) async => pdfBytes);
+                },
+              ),
+            ],
+          ),
+          body: PdfPreview(
+            build: (_) async => pdfBytes,
+            canChangePageFormat: false,
+            canChangeOrientation: false,
+            canDebug: false,
+            allowPrinting: false,
+            allowSharing: false,
+            pdfFileName: '${receipt.receiptNumber}.pdf',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load receipt: $e')),
+        );
+      }
+    }
   }
 
   Widget _actionButton({

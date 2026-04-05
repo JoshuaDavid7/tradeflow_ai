@@ -66,10 +66,15 @@ class PaymentReceiptService {
 
     // Store in Supabase
     try {
-      await _supabase.from('payment_receipts').upsert(receipt.toJson());
+      final json = receipt.toJson();
+      // Remove null values that might cause issues
+      json.removeWhere((key, value) => value == null);
+      await _supabase.from('payment_receipts').upsert(
+        json,
+        onConflict: 'payment_id',
+      );
     } catch (e) {
-      debugPrint('Failed to store payment receipt: $e');
-      // Non-blocking — receipt is still returned for immediate use.
+      debugPrint('Receipt storage error: $e');
     }
 
     return receipt;
